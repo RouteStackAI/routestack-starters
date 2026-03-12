@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "RouteStack Travel Agent",
+  "version": "0.1.0",
+  "description": "AI travel agent that reads page context and suggests flights, hotels, and cars via RouteStack.",
+  "permissions": ["sidePanel", "activeTab"],
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/extractor.ts"]
+    }
+  ],
+  "action": {
+    "default_title": "RouteStack Travel Agent"
+  }
+}

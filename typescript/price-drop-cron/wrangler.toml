@@ -1,0 +1,11 @@
+name = "routestack-price-drop-cron"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[triggers]
+crons = ["0 9 * * *"]  # Daily at 9am UTC
+
+# Uncomment and fill in after running: wrangler kv namespace create PRICE_CACHE
+# [[kv_namespaces]]
+# binding = "PRICE_CACHE"
+# id = "your-kv-namespace-id"

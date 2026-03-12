@@ -1,0 +1,16 @@
+{
+  "name": "@routestack/discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Discord bot for travel search",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

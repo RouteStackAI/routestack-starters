@@ -1,0 +1,16 @@
+{
+  "name": "@routestack/cli-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Terminal-based travel search tool using RouteStack MCP",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
