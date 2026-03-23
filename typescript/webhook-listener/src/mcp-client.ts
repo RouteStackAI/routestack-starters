@@ -1,51 +1,97 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import {
+  LoggingMessageNotificationSchema,
+  ResourceUpdatedNotificationSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { config } from "./config.js";
 
-/**
- * RouteStack MCP Client
- *
- * Connects to the RouteStack MCP server via SSE and provides
- * access to travel tools (flights, hotels, cars).
- *
- * TODO: Replace with actual MCP client implementation when
- * the RouteStack MCP server endpoint is finalized.
- */
-
-export interface McpTool {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
+export interface McpEvent {
+  type: string;
+  data: Record<string, unknown>;
+  timestamp: string;
 }
 
-export interface McpToolResult {
-  content: unknown;
-  isError?: boolean;
-}
+export type EventHandler = (event: McpEvent) => Promise<void>;
 
-export async function connectMcp(): Promise<void> {
+let client: Client | null = null;
+
+export async function connectMcp(onEvent: EventHandler): Promise<void> {
   const { apiKey, mcpUrl } = config.routestack;
+  const url = new URL(mcpUrl);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+  };
 
-  console.log(`Connecting to RouteStack MCP at ${mcpUrl}...`);
+  client = new Client({ name: "routestack-webhook-listener", version: "0.1.0" });
 
-  // TODO: Initialize MCP client connection via SSE
-  // const client = new McpClient({ url: mcpUrl, apiKey });
-  // await client.connect();
+  try {
+    const transport = new StreamableHTTPClientTransport(url, {
+      requestInit: { headers },
+    });
+    await client.connect(transport);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const isTransportMismatch =
+      message.includes("404") ||
+      message.includes("405") ||
+      message.includes("Not Found") ||
+      message.includes("Method Not Allowed");
 
-  console.log("Connected to RouteStack MCP server.");
-}
+    if (!isTransportMismatch) throw err;
 
-export async function listTools(): Promise<McpTool[]> {
-  // TODO: Fetch available tools from MCP server
-  return [];
-}
+    await client.close().catch(() => {});
+    client = new Client({
+      name: "routestack-webhook-listener",
+      version: "0.1.0",
+    });
+    const sseTransport = new SSEClientTransport(url, {
+      requestInit: { headers },
+    });
+    await client.connect(sseTransport);
+  }
 
-export async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  // TODO: Call MCP tool and return result
-  console.log(`Calling tool: ${name}`, args);
-  return { content: null };
+  // Listen for server log/event messages
+  client.setNotificationHandler(
+    LoggingMessageNotificationSchema,
+    async (notification) => {
+      const { level, data } = notification.params;
+      const eventData = (typeof data === "object" && data !== null ? data : { raw: data }) as Record<string, unknown>;
+      const eventType = (eventData.type as string) ?? level ?? "unknown";
+
+      const event: McpEvent = {
+        type: eventType,
+        data: eventData,
+        timestamp: new Date().toISOString(),
+      };
+
+      await onEvent(event).catch((err) => {
+        console.error(`Event handler error: ${err instanceof Error ? err.message : err}`);
+      });
+    },
+  );
+
+  // Listen for resource updates (alternative event pattern)
+  client.setNotificationHandler(
+    ResourceUpdatedNotificationSchema,
+    async (notification) => {
+      const event: McpEvent = {
+        type: "resource.updated",
+        data: { uri: notification.params.uri },
+        timestamp: new Date().toISOString(),
+      };
+
+      await onEvent(event).catch((err) => {
+        console.error(`Event handler error: ${err instanceof Error ? err.message : err}`);
+      });
+    },
+  );
 }
 
 export async function disconnectMcp(): Promise<void> {
-  // TODO: Gracefully close MCP connection
-  console.log("Disconnected from RouteStack MCP server.");
+  if (client) {
+    await client.close();
+    client = null;
+  }
 }
-

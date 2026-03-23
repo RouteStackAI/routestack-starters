@@ -1,14 +1,7 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { config } from "./config.js";
-
-/**
- * RouteStack MCP Client
- *
- * Connects to the RouteStack MCP server via SSE and provides
- * access to travel tools (flights, hotels, cars).
- *
- * TODO: Replace with actual MCP client implementation when
- * the RouteStack MCP server endpoint is finalized.
- */
 
 export interface McpTool {
   name: string;
@@ -17,35 +10,83 @@ export interface McpTool {
 }
 
 export interface McpToolResult {
-  content: unknown;
+  content: Array<{ type: string; text?: string; [key: string]: unknown }>;
   isError?: boolean;
 }
 
+let client: Client | null = null;
+
 export async function connectMcp(): Promise<void> {
   const { apiKey, mcpUrl } = config.routestack;
+  const url = new URL(mcpUrl);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+  };
 
-  console.log(`Connecting to RouteStack MCP at ${mcpUrl}...`);
+  client = new Client({ name: "routestack-chat", version: "0.1.0" });
 
-  // TODO: Initialize MCP client connection via SSE
-  // const client = new McpClient({ url: mcpUrl, apiKey });
-  // await client.connect();
+  try {
+    const transport = new StreamableHTTPClientTransport(url, {
+      requestInit: { headers },
+    });
+    await client.connect(transport);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const isTransportMismatch =
+      message.includes("404") ||
+      message.includes("405") ||
+      message.includes("Not Found") ||
+      message.includes("Method Not Allowed");
 
-  console.log("Connected to RouteStack MCP server.");
+    if (!isTransportMismatch) throw err;
+
+    await client.close().catch(() => {});
+    client = new Client({ name: "routestack-chat", version: "0.1.0" });
+    const sseTransport = new SSEClientTransport(url, {
+      requestInit: { headers },
+    });
+    await client.connect(sseTransport);
+  }
 }
 
 export async function listTools(): Promise<McpTool[]> {
-  // TODO: Fetch available tools from MCP server
-  return [];
+  if (!client) throw new Error("MCP client not connected");
+
+  const allTools: McpTool[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const result = await client.listTools({ cursor });
+    allTools.push(
+      ...result.tools.map((t) => ({
+        name: t.name,
+        description: t.description ?? "",
+        inputSchema: (t.inputSchema ?? {}) as Record<string, unknown>,
+      })),
+    );
+    cursor = result.nextCursor;
+  } while (cursor);
+
+  return allTools;
 }
 
-export async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  // TODO: Call MCP tool and return result
-  console.log(`Calling tool: ${name}`, args);
-  return { content: null };
+export async function callTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<McpToolResult> {
+  if (!client) throw new Error("MCP client not connected");
+
+  const result = await client.callTool({ name, arguments: args });
+
+  return {
+    content: (result.content ?? []) as McpToolResult["content"],
+    isError: result.isError as boolean | undefined,
+  };
 }
 
 export async function disconnectMcp(): Promise<void> {
-  // TODO: Gracefully close MCP connection
-  console.log("Disconnected from RouteStack MCP server.");
+  if (client) {
+    await client.close();
+    client = null;
+  }
 }
-
