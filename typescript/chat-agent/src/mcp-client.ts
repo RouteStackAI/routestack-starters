@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import crypto from "node:crypto";
 import { config } from "./config.js";
 
 export interface McpTool {
@@ -16,11 +17,66 @@ export interface McpToolResult {
 
 let client: Client | null = null;
 
+let cachedPartnerToken: string | null = null;
+
+async function getPartnerToken(): Promise<string> {
+  if (cachedPartnerToken) return cachedPartnerToken;
+
+  const { apiKey, apiSecret, mcpUrl } = config.routestack;
+  if (!apiSecret) {
+    // If no secret is configured, fall back to using apiKey directly as a bearer token.
+    // (Some deployments support this, but evolvemcp requires the partner-token flow.)
+    return apiKey;
+  }
+
+  const ts = Math.floor(Date.now() / 1000);
+  const nonce = crypto.randomUUID();
+  const hmac = crypto
+    .createHmac("sha256", apiSecret)
+    .update(`${apiKey}:${ts}:${nonce}`)
+    .digest("base64url");
+
+  const base = new URL(mcpUrl);
+  const tokenUrl = new URL("/mcp/auth/partner-token", base.origin);
+
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ apiKey, hmac, timestamp: ts, nonce }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Partner-token request failed (${res.status}): ${text}`);
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(`Partner-token response was not JSON: ${text}`);
+  }
+
+  const token =
+    (data as { token?: string }).token ??
+    (data as { accessToken?: string }).accessToken ??
+    (data as { partnerToken?: string }).partnerToken ??
+    (data as { jwt?: string }).jwt;
+
+  if (!token || typeof token !== "string") {
+    throw new Error(`Partner-token response missing token field: ${text}`);
+  }
+
+  cachedPartnerToken = token;
+  return token;
+}
+
 export async function connectMcp(): Promise<void> {
-  const { apiKey, mcpUrl } = config.routestack;
+  const { mcpUrl } = config.routestack;
   const url = new URL(mcpUrl);
+  const token = await getPartnerToken();
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: `Bearer ${token}`,
   };
 
   client = new Client({ name: "routestack-chat", version: "0.1.0" });

@@ -9,10 +9,11 @@ import {
   disconnectMcp,
   type McpTool,
 } from "./mcp-client.js";
-import { chat, type Message } from "./llm.js";
+import { chat, ToolExecutionContext, type Message } from "./llm.js";
 
 const app = new Hono();
 let tools: McpTool[] = [];
+const context: ToolExecutionContext = { hotel: {} };
 
 // Health check
 app.get("/health", (c) =>
@@ -58,7 +59,7 @@ app.post("/api/chat", async (c) => {
     const toolCalls: Array<{ name: string; args: Record<string, unknown> }> =
       [];
 
-    const result = await chat(messages, tools, (name, args) => {
+    const result = await chat(messages, tools, context, (name, args) => {
       toolCalls.push({ name, args });
       console.log(chalk.dim(`  -> ${name}(${JSON.stringify(args)})`));
     });
@@ -81,9 +82,15 @@ app.use("/*", serveStatic({ root: "./public" }));
 // Startup
 async function main() {
   console.log(chalk.bold("\nRouteStack Chat Agent\n"));
+  const model =
+    config.llm.provider === "openai"
+      ? config.llm.openai.model
+      : config.llm.provider === "anthropic"
+        ? config.llm.anthropic.model
+        : config.llm.mistral.model;
   console.log(
     chalk.dim(
-      `LLM: ${config.llm.provider} (${config.llm.provider === "openai" ? config.llm.openai.model : config.llm.anthropic.model})`,
+      `LLM: ${config.llm.provider} (${model})`,
     ),
   );
   console.log(chalk.dim(`MCP: ${config.routestack.mcpUrl}\n`));

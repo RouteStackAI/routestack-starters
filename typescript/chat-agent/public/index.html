@@ -1,499 +1,643 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RouteStack Chat</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #0a0a0f;
-      --surface: #14141f;
-      --surface-hover: #1a1a28;
-      --border: #2a2a3a;
-      --text: #e0e0e6;
-      --text-muted: #6b6b80;
-      --gold: #f5c542;
-      --gold-dim: rgba(245, 197, 66, 0.08);
-      --gold-border: rgba(245, 197, 66, 0.3);
-      --error: #ef4444;
-      --radius: 12px;
-      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
-    }
-
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 15px;
-      line-height: 1.6;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Header */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      flex-shrink: 0;
-    }
-
-    .header-title {
-      font-size: 17px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-
-    .header-title span {
-      color: var(--gold);
-    }
-
-    .header-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--text-muted);
-    }
-
-    .status-dot.connected {
-      background: #22c55e;
-      box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
-    }
-
-    /* Messages area */
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .messages::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .messages::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .messages::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 3px;
-    }
-
-    /* Message bubbles */
-    .message {
-      max-width: 80%;
-      animation: fadeIn 0.2s ease-out;
-    }
-
-    .message.user {
-      align-self: flex-end;
-    }
-
-    .message.assistant {
-      align-self: flex-start;
-    }
-
-    .message-bubble {
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      word-break: break-word;
-    }
-
-    .message.user .message-bubble {
-      background: var(--gold-dim);
-      border: 1px solid var(--gold-border);
-    }
-
-    .message.assistant .message-bubble {
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    .message-bubble p { margin-bottom: 8px; }
-    .message-bubble p:last-child { margin-bottom: 0; }
-    .message-bubble strong { font-weight: 600; }
-
-    .message-bubble code {
-      font-family: var(--mono);
-      font-size: 13px;
-      background: rgba(255, 255, 255, 0.06);
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    .message-bubble pre {
-      margin: 8px 0;
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
-      overflow-x: auto;
-    }
-
-    .message-bubble pre code {
-      background: none;
-      padding: 0;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    /* Tool call badges */
-    .tool-calls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
-      align-self: flex-start;
-    }
-
-    .tool-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      font-size: 12px;
-      color: var(--text-muted);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-    }
-
-    .tool-badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--gold);
-      flex-shrink: 0;
-    }
-
-    /* Typing indicator */
-    .typing {
-      align-self: flex-start;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      display: none;
-    }
-
-    .typing.visible {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-
-    .typing-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--text-muted);
-      animation: bounce 1.4s infinite ease-in-out;
-    }
-
-    .typing-dot:nth-child(2) { animation-delay: 0.16s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.32s; }
-
-    /* Input area */
-    .input-area {
-      padding: 16px 20px;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-      flex-shrink: 0;
-    }
-
-    .input-row {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-    }
-
-    .input-row textarea {
-      flex: 1;
-      resize: none;
-      overflow: hidden;
-      min-height: 42px;
-      max-height: 120px;
-      padding: 10px 14px;
-      font-family: var(--font);
-      font-size: 15px;
-      line-height: 1.5;
-      color: var(--text);
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    .input-row textarea:focus {
-      border-color: var(--gold-border);
-    }
-
-    .input-row textarea::placeholder {
-      color: var(--text-muted);
-    }
-
-    .send-btn {
-      flex-shrink: 0;
-      width: 42px;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--gold);
-      color: #0a0a0f;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-
-    .send-btn:hover { opacity: 0.85; }
-    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .send-btn svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    /* Error message */
-    .error-msg {
-      color: var(--error);
-      font-size: 13px;
-      padding: 8px 0 0;
-    }
-
-    /* Animations */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
-
-    /* Responsive */
-    @media (max-width: 600px) {
-      .message { max-width: 90%; }
-      .messages { padding: 14px; }
-      .input-area { padding: 12px 14px; }
-    }
-  </style>
-</head>
-<body>
-
-  <div class="header">
-    <div class="header-title">Route<span>Stack</span> Chat</div>
-    <div class="header-status">
-      <div class="status-dot" id="statusDot"></div>
-      <span id="statusText">Connecting...</span>
-    </div>
-  </div>
-
-  <div class="messages" id="messages"></div>
-
-  <div class="input-area">
-    <div class="input-row">
-      <textarea
-        id="input"
-        rows="1"
-        placeholder="Ask about flights, hotels, or car rentals..."
-        disabled
-      ></textarea>
-      <button class="send-btn" id="sendBtn" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
-    <div class="error-msg" id="errorMsg"></div>
-  </div>
-
-  <script>
-    const messagesEl = document.getElementById('messages');
-    const inputEl = document.getElementById('input');
-    const sendBtn = document.getElementById('sendBtn');
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const errorMsg = document.getElementById('errorMsg');
-
-    let history = [];
-    let busy = false;
-
-    // Auto-resize textarea
-    inputEl.addEventListener('input', () => {
-      inputEl.style.height = 'auto';
-      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
-    });
-
-    // Enter to send, Shift+Enter for newline
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        send();
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RouteStack Chat</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
-    });
 
-    sendBtn.addEventListener('click', send);
-
-    // Check server health on load
-    async function checkHealth() {
-      try {
-        const res = await fetch('/health');
-        const data = await res.json();
-        statusDot.classList.add('connected');
-        const toolCount = data.tools ?? 0;
-        statusText.textContent = `${toolCount} tool${toolCount === 1 ? '' : 's'} available`;
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
-        inputEl.focus();
-        addWelcomeMessage();
-      } catch {
-        statusText.textContent = 'Disconnected';
-        errorMsg.textContent = 'Cannot reach server. Is it running?';
+      :root {
+        --bg: #0a0a0f;
+        --surface: #14141f;
+        --surface-hover: #1a1a28;
+        --border: #2a2a3a;
+        --text: #e0e0e6;
+        --text-muted: #6b6b80;
+        --gold: #f5c542;
+        --gold-dim: rgba(245, 197, 66, 0.08);
+        --gold-border: rgba(245, 197, 66, 0.3);
+        --error: #ef4444;
+        --radius: 12px;
+        --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+        --mono: "SF Mono", "Cascadia Code", "Fira Code", monospace;
       }
-    }
 
-    function addWelcomeMessage() {
-      addMessage('assistant', 'Welcome to RouteStack Chat! I can help you search for flights, hotels, and car rentals.\n\nTry asking:\n- "Find flights from LAX to JFK on December 15"\n- "Search hotels near Times Square"\n- "I need a car rental in Miami for next week"');
-    }
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.6;
+      }
 
-    async function send() {
-      const text = inputEl.value.trim();
-      if (!text || busy) return;
+      body {
+        display: flex;
+        flex-direction: column;
+      }
 
-      errorMsg.textContent = '';
-      busy = true;
-      inputEl.disabled = true;
-      sendBtn.disabled = true;
+      /* Header */
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        flex-shrink: 0;
+      }
 
-      addMessage('user', text);
-      inputEl.value = '';
-      inputEl.style.height = 'auto';
+      .header-title {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
 
-      showTyping(true);
+      .header-title span {
+        color: var(--gold);
+      }
 
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history }),
+      .header-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+      }
+
+      .status-dot.connected {
+        background: #22c55e;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+      }
+
+      /* Messages area */
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .messages::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .messages::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .messages::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+
+      /* Message bubbles */
+      .message {
+        max-width: 80%;
+        animation: fadeIn 0.2s ease-out;
+      }
+
+      .message.user {
+        align-self: flex-end;
+      }
+
+      .message a {
+        color: #398ceb;
+      }
+
+      .message.assistant {
+        align-self: flex-start;
+      }
+
+      .message-bubble {
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        word-break: break-word;
+      }
+
+      .message.user .message-bubble {
+        background: var(--gold-dim);
+        border: 1px solid var(--gold-border);
+      }
+
+      .message.assistant .message-bubble {
+        background: var(--surface);
+        border: 1px solid var(--border);
+      }
+
+      .message-bubble p {
+        margin-bottom: 8px;
+      }
+      .message-bubble p:last-child {
+        margin-bottom: 0;
+      }
+      .message-bubble strong {
+        font-weight: 600;
+      }
+
+      .message-bubble code {
+        font-family: var(--mono);
+        font-size: 13px;
+        background: rgba(255, 255, 255, 0.06);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .message-bubble pre {
+        margin: 8px 0;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+
+      .message-bubble pre code {
+        background: none;
+        padding: 0;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* Tool call badges */
+      .tool-calls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
+        align-self: flex-start;
+      }
+
+      .tool-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+
+      .tool-badge::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold);
+        flex-shrink: 0;
+      }
+
+      /* Typing indicator */
+      .typing {
+        align-self: flex-start;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        display: none;
+      }
+
+      .typing.visible {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .typing-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        animation: bounce 1.4s infinite ease-in-out;
+      }
+
+      .typing-dot:nth-child(2) {
+        animation-delay: 0.16s;
+      }
+      .typing-dot:nth-child(3) {
+        animation-delay: 0.32s;
+      }
+
+      /* Input area */
+      .input-area {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+
+      .input-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+      }
+
+      .input-row textarea {
+        flex: 1;
+        resize: none;
+        overflow: hidden;
+        min-height: 42px;
+        max-height: 120px;
+        padding: 10px 14px;
+        font-family: var(--font);
+        font-size: 15px;
+        line-height: 1.5;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      .input-row textarea:focus {
+        border-color: var(--gold-border);
+      }
+
+      .input-row textarea::placeholder {
+        color: var(--text-muted);
+      }
+
+      .send-btn {
+        flex-shrink: 0;
+        width: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--gold);
+        color: #0a0a0f;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+
+      .send-btn:hover {
+        opacity: 0.85;
+      }
+      .send-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .send-btn svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      /* Error message */
+      .error-msg {
+        color: var(--error);
+        font-size: 13px;
+        padding: 8px 0 0;
+      }
+
+      .message-time {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        padding: 0 4px;
+      }
+
+      .message.user .message-time {
+        text-align: right;
+      }
+
+      .message.assistant .message-time {
+        text-align: left;
+      }
+
+      /* Better link styling */
+      .message-bubble a {
+        color: #f5c542;
+        text-decoration: underline;
+        word-break: break-all;
+      }
+
+      /* Image improvements */
+      .chat-image {
+        max-width: 500px;
+        border-radius: 10px;
+        margin-top: 8px;
+        display: block;
+      }
+
+      /* Animations */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+
+      /* Responsive */
+      @media (max-width: 600px) {
+        .message {
+          max-width: 90%;
+        }
+        .messages {
+          padding: 14px;
+        }
+        .input-area {
+          padding: 12px 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-title">Route<span>Stack</span> Chat</div>
+      <div class="header-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="Ask about flights, hotels, or car rentals..."
+          disabled
+        ></textarea>
+        <button class="send-btn" id="sendBtn" disabled>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <script>
+      const messagesEl = document.getElementById("messages");
+      const inputEl = document.getElementById("input");
+      const sendBtn = document.getElementById("sendBtn");
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
+      const errorMsg = document.getElementById("errorMsg");
+
+      let history = [];
+      let busy = false;
+
+      // Auto-resize textarea
+      inputEl.addEventListener("input", () => {
+        inputEl.style.height = "auto";
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
+      });
+
+      // Enter to send, Shift+Enter for newline
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      });
+
+      sendBtn.addEventListener("click", send);
+
+      // Check server health on load
+      async function checkHealth() {
+        try {
+          const res = await fetch("/health");
+          const data = await res.json();
+          statusDot.classList.add("connected");
+          const toolCount = data.tools ?? 0;
+          statusText.textContent = `${toolCount} tool${toolCount === 1 ? "" : "s"} available`;
+          inputEl.disabled = false;
+          sendBtn.disabled = false;
+          inputEl.focus();
+          addWelcomeMessage();
+        } catch {
+          statusText.textContent = "Disconnected";
+          errorMsg.textContent = "Cannot reach server. Is it running?";
+        }
+      }
+
+      function addWelcomeMessage() {
+        addMessage(
+          "assistant",
+          'Welcome to RouteStack Chat! I can help you search for flights, hotels, and car rentals.\n\nTry asking:\n- "Find flights from LAX to JFK on December 15"\n- "Search hotels near Times Square"\n- "I need a car rental in Miami for next week"',
+        );
+      }
+
+      async function send() {
+        const text = inputEl.value.trim();
+        if (!text || busy) return;
+
+        errorMsg.textContent = "";
+        busy = true;
+        inputEl.disabled = true;
+        sendBtn.disabled = true;
+
+        addMessage("user", text);
+        inputEl.value = "";
+        inputEl.style.height = "auto";
+
+        showTyping(true);
+
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, history }),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || "Request failed");
+          }
+
+          showTyping(false);
+
+          // Show tool call badges
+          if (data.toolCalls && data.toolCalls.length > 0) {
+            addToolCalls(data.toolCalls);
+          }
+
+          addMessage("assistant", data.response);
+          history = data.history;
+        } catch (err) {
+          showTyping(false);
+          errorMsg.textContent = err.message;
+        } finally {
+          busy = false;
+          inputEl.disabled = false;
+          sendBtn.disabled = false;
+          inputEl.focus();
+        }
+      }
+
+      function addMessage(role, content) {
+        const div = document.createElement("div");
+        div.className = `message ${role}`;
+
+        const time = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
         });
 
-        const data = await res.json();
+        div.innerHTML = `
+          <div class="message-bubble">
+            ${renderMarkdown(content)}
+          </div>
+          <div class="message-time">${time}</div>
+        `;
 
-        if (!res.ok) {
-          throw new Error(data.error || 'Request failed');
+        messagesEl.appendChild(div);
+        scrollToBottom();
+      }
+
+      function addToolCalls(toolCalls) {
+        const div = document.createElement("div");
+        div.className = "tool-calls";
+        div.innerHTML = toolCalls
+          .map((tc) => {
+            const argsStr = Object.entries(tc.args)
+              .map(
+                ([k, v]) =>
+                  `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`,
+              )
+              .join(", ");
+            return `<span class="tool-badge">${escapeHtml(tc.name)}(${escapeHtml(argsStr)})</span>`;
+          })
+          .join("");
+        messagesEl.appendChild(div);
+        scrollToBottom();
+      }
+
+      function showTyping(visible) {
+        let el = document.getElementById("typing");
+
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "typing";
+          el.className = "typing";
+          el.innerHTML =
+            '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
         }
 
-        showTyping(false);
+        if (visible) {
+          el.classList.add("visible");
 
-        // Show tool call badges
-        if (data.toolCalls && data.toolCalls.length > 0) {
-          addToolCalls(data.toolCalls);
+          // 🔑 KEY FIX: Always move loader to bottom
+          messagesEl.appendChild(el);
+          scrollToBottom();
+        } else {
+          el.classList.remove("visible");
         }
-
-        addMessage('assistant', data.response);
-        history = data.history;
-      } catch (err) {
-        showTyping(false);
-        errorMsg.textContent = err.message;
-      } finally {
-        busy = false;
-        inputEl.disabled = false;
-        sendBtn.disabled = false;
-        inputEl.focus();
       }
-    }
 
-    function addMessage(role, content) {
-      const div = document.createElement('div');
-      div.className = `message ${role}`;
-      div.innerHTML = `<div class="message-bubble">${renderMarkdown(content)}</div>`;
-      messagesEl.appendChild(div);
-      scrollToBottom();
-    }
-
-    function addToolCalls(toolCalls) {
-      const div = document.createElement('div');
-      div.className = 'tool-calls';
-      div.innerHTML = toolCalls
-        .map((tc) => {
-          const argsStr = Object.entries(tc.args)
-            .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
-            .join(', ');
-          return `<span class="tool-badge">${escapeHtml(tc.name)}(${escapeHtml(argsStr)})</span>`;
-        })
-        .join('');
-      messagesEl.appendChild(div);
-      scrollToBottom();
-    }
-
-    function showTyping(visible) {
-      let el = document.getElementById('typing');
-      if (!el) {
-        el = document.createElement('div');
-        el.id = 'typing';
-        el.className = 'typing';
-        el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-        messagesEl.appendChild(el);
+      function scrollToBottom() {
+        messagesEl.scrollTo({
+          top: messagesEl.scrollHeight,
+          behavior: "smooth",
+        });
       }
-      el.classList.toggle('visible', visible);
-      if (visible) scrollToBottom();
-    }
 
-    function scrollToBottom() {
-      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
-    }
+      // Markdown-lite renderer
+      function renderMarkdown(text) {
+        // ✅ Escape once
+        let html = escapeHtml(text);
 
-    // Markdown-lite renderer
-    function renderMarkdown(text) {
-      return text
-        // Code blocks
-        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-          `<pre><code>${escapeHtml(code.trim())}</code></pre>`)
-        // Inline code
-        .replace(/`([^`]+)`/g, (_, code) =>
-          `<code>${escapeHtml(code)}</code>`)
-        // Bold
-        .replace(/\*\*(.+?)\*\*/g, (_, inner) => `<strong>${escapeHtml(inner)}</strong>`)
-        // Line breaks → paragraphs
-        .split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-    }
+        // --- Code blocks ---
+        html = html.replace(
+          /```([\s\S]*?)```/g,
+          (_, code) => `<pre><code>${code.trim()}</code></pre>`,
+        );
 
-    function escapeHtml(str) {
-      const el = document.createElement('span');
-      el.textContent = str;
-      return el.innerHTML;
-    }
+        // --- Inline code ---
+        html = html.replace(/`([^`]+)`/g, `<code>$1</code>`);
 
-    checkHealth();
-  </script>
-</body>
+        // --- Images ---
+        html = html.replace(
+          /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g,
+          `<img src="$2" alt="$1" class="chat-image" />`,
+        );
+
+        // --- Links ---
+        html = html.replace(
+          /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+          `<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>`,
+        );
+
+        // --- Bold ---
+        html = html.replace(/\*\*(.+?)\*\*/g, `<strong>$1</strong>`);
+
+        // --- Headings ---
+        html = html.replace(/^### (.*)$/gm, `<h3>$1</h3>`);
+
+        // --- Lists ---
+        html = html.replace(/(?:^|\n)- (.*)/g, `<li>$1</li>`);
+        html = html.replace(/(<li>.*<\/li>)/g, `<ul>$1</ul>`);
+
+        // --- Raw URLs (LAST, avoid breaking existing tags) ---
+        html = html.replace(
+          /(^|[\s>])(https?:\/\/[^\s<]+)/g,
+          `$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>`,
+        );
+
+        // --- Paragraphs ---
+        return html
+          .split("\n\n")
+          .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
+          .join("");
+      }
+
+      function escapeHtml(str) {
+        const el = document.createElement("span");
+        el.textContent = str;
+        return el.innerHTML;
+      }
+
+      checkHealth();
+    </script>
+  </body>
 </html>
