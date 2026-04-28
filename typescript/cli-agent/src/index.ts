@@ -2,13 +2,15 @@ import { createInterface } from "node:readline";
 import chalk from "chalk";
 import { config } from "./config.js";
 import { connectMcp, listTools, disconnectMcp } from "./mcp-client.js";
-import { chat, type Message } from "./llm.js";
+import { chat, ToolExecutionContext, type Message } from "./llm.js";
 import {
   formatToolCall,
   formatAssistant,
   formatError,
   formatConnected,
 } from "./formatter.js";
+
+const context: ToolExecutionContext = { hotel: {} };
 
 async function main() {
   console.log(chalk.bold("\nRouteStack CLI Agent\n"));
@@ -90,7 +92,7 @@ async function main() {
     messages.push({ role: "user", content: input });
 
     try {
-      const result = await chat(messages, tools, (name, args) => {
+      const result = await chat(messages, tools, context, (name, args) => {
         console.log(formatToolCall(name, args));
       });
 

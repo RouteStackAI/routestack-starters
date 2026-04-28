@@ -23,6 +23,7 @@ pnpm dev
 | Variable | Required | Description |
 | :--- | :--- | :--- |
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
+| `ROUTESTACK_API_SECRET` | Yes | Your RouteStack API secret |
 | `ROUTESTACK_MCP_URL` | No | MCP server endpoint (default: `https://mcp.routestack.ai/sse`) |
 | `LLM_PROVIDER` | No | `openai` (default), `anthropic`, or `mistral` |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |

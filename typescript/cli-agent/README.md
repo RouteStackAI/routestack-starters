@@ -22,12 +22,17 @@ pnpm start
 | Variable | Required | Description |
 | :--------- | :--------- | :------------ |
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
+| `ROUTESTACK_API_SECRET` | Yes | Your RouteStack API secret |
 | `ROUTESTACK_MCP_URL` | No | MCP server endpoint (default: `https://mcp.routestack.ai/sse`) |
 | `LLM_PROVIDER` | No | `openai` (default) or `anthropic` |
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI API key |
 | `OPENAI_MODEL` | No | OpenAI model (default: `gpt-4o`) |
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `ANTHROPIC_MODEL` | No | Anthropic model (default: `claude-sonnet-4-5-latest`) |
+| `MISTRAL_API_KEY` | If using Mistral | Mistral API key |
+| `MISTRAL_MODEL` | No | Mistral model (default: `mistral-large-latest`) |
+| `MISTRAL_BASE_URL` | No | Mistral API base URL (default: `https://api.mistral.ai/v1`) |
+| `PORT` | No | Server port (default: `3000`) |
 
 ## How It Works
 
