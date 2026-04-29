@@ -1,15 +1,3 @@
-import { config } from "./config.js";
-
-/**
- * RouteStack MCP Client
- *
- * Connects to the RouteStack MCP server via SSE and provides
- * access to travel tools (flights, hotels, cars).
- *
- * TODO: Replace with actual MCP client implementation when
- * the RouteStack MCP server endpoint is finalized.
- */
-
 export interface McpTool {
   name: string;
   description: string;
@@ -17,35 +5,61 @@ export interface McpTool {
 }
 
 export interface McpToolResult {
-  content: unknown;
+  content: Array<{ type: string; text?: string; [key: string]: unknown }>;
   isError?: boolean;
 }
 
+let apiBaseUrl = "";
+
+function apiPath(path: string) {
+  return `${apiBaseUrl}${path}`;
+}
+
+export function setApiBaseUrl(baseUrl?: string) {
+  apiBaseUrl = (baseUrl ?? "").replace(/\/$/, "");
+}
+
 export async function connectMcp(): Promise<void> {
-  const { apiKey, mcpUrl } = config.routestack;
-
-  console.log(`Connecting to RouteStack MCP at ${mcpUrl}...`);
-
-  // TODO: Initialize MCP client connection via SSE
-  // const client = new McpClient({ url: mcpUrl, apiKey });
-  // await client.connect();
-
-  console.log("Connected to RouteStack MCP server.");
+  const response = await fetch(apiPath("/api/health"));
+  if (!response.ok) {
+    throw new Error(`Widget backend is unavailable (${response.status}).`);
+  }
 }
 
 export async function listTools(): Promise<McpTool[]> {
-  // TODO: Fetch available tools from MCP server
-  return [];
+  const response = await fetch(apiPath("/api/tools"));
+  if (!response.ok) {
+    throw new Error(`Failed to load tools (${response.status}).`);
+  }
+
+  const payload = (await response.json()) as { tools?: McpTool[] };
+  return payload.tools ?? [];
 }
 
-export async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  // TODO: Call MCP tool and return result
-  console.log(`Calling tool: ${name}`, args);
-  return { content: null };
+export async function callTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<McpToolResult> {
+  const response = await fetch(apiPath("/api/tool"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ name, args }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Tool request failed (${response.status}).`);
+  }
+
+  return (await response.json()) as McpToolResult;
 }
 
 export async function disconnectMcp(): Promise<void> {
-  // TODO: Gracefully close MCP connection
-  console.log("Disconnected from RouteStack MCP server.");
+  return Promise.resolve();
 }
 
+export function getTransportKind() {
+  return "server-bridge";
+}
