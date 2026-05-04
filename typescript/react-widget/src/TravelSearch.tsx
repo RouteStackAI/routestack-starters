@@ -152,8 +152,8 @@ const DEFAULT_HOTEL_FORM: HotelFormState = {
 };
 
 const DEFAULT_FLIGHT_FORM: FlightFormState = {
-  originQuery: "SFO",
-  destinationQuery: "JFK",
+  originQuery: "",
+  destinationQuery: "",
   selectedOrigin: null,
   selectedDestination: null,
   departureDate: getFutureDate(14),
@@ -240,6 +240,11 @@ export function TravelSearch({
     hotelForm.destinationQuery,
     450,
   );
+  const debouncedFlightOriginQuery = useDebouncedValue(flightForm.originQuery, 450);
+  const debouncedFlightDestinationQuery = useDebouncedValue(
+    flightForm.destinationQuery,
+    450,
+  );
 
   useEffect(() => {
     setApiBaseUrl(apiBaseUrl);
@@ -260,6 +265,28 @@ export function TravelSearch({
 
     void searchHotelDestinations(debouncedHotelQuery);
   }, [debouncedHotelQuery, hotelForm.selectedDestination, mode]);
+
+  useEffect(() => {
+    if (mode !== "flights") return;
+    if (flightForm.selectedOrigin) return;
+    if (debouncedFlightOriginQuery.trim().length < 2) {
+      setFlightFlow((current) => ({ ...current, originOptions: [] }));
+      return;
+    }
+
+    void lookupFlightLocations("origin", debouncedFlightOriginQuery);
+  }, [debouncedFlightOriginQuery, flightForm.selectedOrigin, mode]);
+
+  useEffect(() => {
+    if (mode !== "flights") return;
+    if (flightForm.selectedDestination) return;
+    if (debouncedFlightDestinationQuery.trim().length < 2) {
+      setFlightFlow((current) => ({ ...current, destinationOptions: [] }));
+      return;
+    }
+
+    void lookupFlightLocations("destination", debouncedFlightDestinationQuery);
+  }, [debouncedFlightDestinationQuery, flightForm.selectedDestination, mode]);
 
   const modeInfo = useMemo(
     () => MODES.find((entry) => entry.value === mode) ?? MODES[0],
@@ -518,9 +545,23 @@ export function TravelSearch({
     }
   }
 
-  async function lookupFlightLocations(kind: "origin" | "destination") {
+  async function lookupFlightLocations(
+    kind: "origin" | "destination",
+    termOverride?: string,
+  ) {
     const term =
-      kind === "origin" ? flightForm.originQuery : flightForm.destinationQuery;
+      termOverride ??
+      (kind === "origin" ? flightForm.originQuery : flightForm.destinationQuery);
+
+    if (term.trim().length < 2) {
+      setFlightFlow((current) => ({
+        ...current,
+        originOptions: kind === "origin" ? [] : current.originOptions,
+        destinationOptions:
+          kind === "destination" ? [] : current.destinationOptions,
+      }));
+      return;
+    }
 
     const payload = await execute(
       `flight-lookup-${kind}`,
@@ -577,8 +618,8 @@ export function TravelSearch({
           departureDate: flightForm.departureDate,
           returnDate: flightForm.returnDate || undefined,
           adults: flightForm.adults,
-          children: flightForm.children,
-          infants: flightForm.infants,
+          // children: flightForm.children,
+          // infants: flightForm.infants,
           cabinClass: flightForm.cabinClass,
           tripType: flightForm.returnDate ? "round_trip" : "one_way",
           originLocation: origin.raw,
@@ -911,7 +952,6 @@ export function TravelSearch({
               loadingDestinationLookup={isLoading("flight-lookup-destination")}
               loadingSearch={isLoading("flight-search")}
               onChange={setFlightForm}
-              onLookup={lookupFlightLocations}
               onSearch={searchFlights}
             />
           )}

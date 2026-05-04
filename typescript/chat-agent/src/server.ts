@@ -13,7 +13,7 @@ import { chat, ToolExecutionContext, type Message } from "./llm.js";
 
 const app = new Hono();
 let tools: McpTool[] = [];
-const context: ToolExecutionContext = { hotel: {} };
+const context: ToolExecutionContext = { hotel: {}, flight: {} };
 
 // Health check
 app.get("/health", (c) =>

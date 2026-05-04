@@ -10,7 +10,7 @@ import { callTool, type McpTool, type McpToolResult } from "./mcp-client.js";
 const SYSTEM_PROMPT = `You are a travel assistant.
 
 STRICT RULES:
-- NEVER invent IDs (hotelId, token, correlationId, recommendationId, roomId).
+- NEVER invent IDs (hotelId, token, correlationId, recommendationId, roomId, fareSourceCode).
 - ALWAYS reuse values from previous tool responses
 - If required data is missing, call the appropriate previous tool
 - Follow correct sequence
@@ -20,6 +20,12 @@ HOTEL FLOW:
 2. search_hotels → get_rooms_and_rates
 3. get_rooms_and_rates → revalidate
 4. revalidate → get_payment_url
+
+FLIGHT FLOW:
+1. flight_session → flight_locations
+2. flight_locations → flight_search
+3. flight_search → flight_revalidate
+4. flight_revalidate → flight_get_payment_url
 
 Be concise and accurate.`;
 
@@ -67,6 +73,17 @@ export interface ToolExecutionContext {
       publishedRate?: number;
     };
   };
+  flight: {
+    sessionId?: string;
+    correlationId?: string;
+    searchFilterObj?: Record<string, unknown>;
+    flights?: any[];
+    selectedFlight?: {
+      fareSourceCode?: string;
+      flights?: any[];
+      ourprice?: number;
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +394,15 @@ function buildToolArgs(
     enriched.publishedRate = hotel.selectedRoom.publishedRate;
   }
 
+  const flight = context.flight;
+  if (
+    "sessionId" in schema &&
+    flight.sessionId !== undefined &&
+    !hasValue(enriched.sessionId)
+  ) {
+    enriched.sessionId = flight.sessionId;
+  }
+
   return enriched;
 }
 
@@ -457,6 +483,16 @@ function updateExecutionContext(
         };
       }
     }
+  }
+
+  if(toolName === "flight_session") {
+    context.flight.sessionId = result?.sessionId ? result.sessionId : "";
+  }
+  
+  if(toolName === "flight_search") {
+    context.flight.searchFilterObj = result?.searchFilterObj;
+    context.flight.correlationId = result?.correlationId;
+    context.flight.flights = result?.result?.flights;
   }
 }
 
@@ -565,6 +601,7 @@ function extractText(result: McpToolResult, toolName: string): string {
 }
 
 function buildContextPrompt(context: ToolExecutionContext): string {
+  // HOTEL CONTEXT
   const hotel = context.hotel ?? {};
   const hotelSummaries = Array.isArray(hotel.hotels)
     ? hotel.hotels
@@ -589,6 +626,24 @@ function buildContextPrompt(context: ToolExecutionContext): string {
         .join("\n")
     : "";
 
+  // FLIGHT CONTEXT
+  const flight = context.flight ?? {};
+  const flightSummaries = Array.isArray(flight.flights)
+    ? flight.flights
+        .slice(0, 5)
+        .map((item: any, index: number) => {
+          const fareSourceCode = item?.fareSourceCode ?? "unknown";
+          const airline = item?.flights?.[0]?.airline ?? "Unknown airline";
+          const flightName = (item?.flights || []).map((f: any) => `Departure: ${f.departure} (departureTime: ${f.departureTime}) -> Arrival: ${f.arrival} (arrivalTime: ${f.arrivalTime})`).join(", ") ?? "Unknown flight";
+          return `${index + 1}. ${flightName} (airline: ${airline}, fareSourceCode: ${fareSourceCode}, stops: ${item?.stops})`;
+        })
+        .join("\n")
+    : "";
+  const selectedFlight = flight.selectedFlight ?? {};
+  const searchFilterObj = flight.searchFilterObj ?? {};
+  const sessionId = flight.sessionId ?? "unknown";
+  const correlationId = flight.correlationId ?? "unknown";
+
   return [
     "CURRENT TOOL CONTEXT:",
     hotel.token
@@ -609,6 +664,24 @@ function buildContextPrompt(context: ToolExecutionContext): string {
     roomSummaries
       ? `- Rooms for selected hotel from previous search:\n${roomSummaries}`
       : "- No cached rooms list",
+    flight.sessionId
+      ? `- Active flight session: ${flight.sessionId}`
+      : "- No active flight session",
+    flight.correlationId
+      ? `- Active flight correlationId: ${flight.correlationId}`
+      : "- No active flight correlationId",
+    flight.selectedFlight?.fareSourceCode
+      ? `- Selected flight: ${flight.selectedFlight.fareSourceCode}`
+      : "- No flight selected yet",
+    flight.searchFilterObj
+      ? `- Active flight search filter: ${JSON.stringify(flight.searchFilterObj)}`
+      : "- No active flight search filter",
+    flightSummaries
+      ? `- Flights from previous search:\n${flightSummaries}`
+      : "- No cached flight list",
+    selectedFlight.fareSourceCode
+      ? `- Selected flight: ${selectedFlight.fareSourceCode}`
+      : "- No flight selected yet",
     "If the user's request can be answered by continuing from this context, do not restart the search flow.",
     "Only call an earlier search tool when the user changed destination/dates/occupancy or required context is genuinely missing.",
   ].join("\n");
@@ -751,6 +824,18 @@ function handleToolResult(json: any, toolName: string) {
           children: bookingResult.children,
         }
       : json;
+  }
+
+  if (toolName === "flight_search" && json) {
+    updatedResult =
+      json?.result?.length > 0
+        ? {
+            ...json,
+            result: {
+              flights: json?.result.slice(0, 5),
+            },
+          }
+        : json;
   }
 
   return updatedResult;

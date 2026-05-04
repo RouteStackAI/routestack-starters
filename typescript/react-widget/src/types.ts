@@ -62,20 +62,52 @@ export interface HotelRoomOffer {
 export interface FlightOffer {
   id: string;
   airline: string;
+  airlineCode?: string;
+  airlineLogo?: string;
   flightNumber: string;
   from: string;
   to: string;
+  originCode?: string;
+  destinationCode?: string;
+  originAirport?: string;
+  destinationAirport?: string;
+  departureCity?: string;
+  arrivalCity?: string;
   departure: string;
   arrival: string;
   duration?: string;
+  durationMinutes?: number;
   price?: number;
   currency?: string;
   stops?: number;
+  cabinClass?: string;
+  refundable?: boolean;
+  baggageText?: string;
+  fareFamily?: string;
+  remainingSeats?: number;
+  layoverSummary?: string;
+  segments?: FlightSegment[];
   fareSourceCode?: string;
   correlationId?: string;
   sessionId?: string;
   searchFilterObj?: string;
   raw: Record<string, unknown>;
+}
+
+export interface FlightSegment {
+  airline: string;
+  airlineCode?: string;
+  flightNumber: string;
+  from: string;
+  to: string;
+  departureCity?: string;
+  arrivalCity?: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  departureTime: string;
+  arrivalTime: string;
+  durationMinutes?: number;
+  cabinClass?: string;
 }
 
 export interface CarOffer {

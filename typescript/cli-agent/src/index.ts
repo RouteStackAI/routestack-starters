@@ -10,7 +10,7 @@ import {
   formatConnected,
 } from "./formatter.js";
 
-const context: ToolExecutionContext = { hotel: {} };
+const context: ToolExecutionContext = { hotel: {}, flight: {} };
 
 async function main() {
   console.log(chalk.bold("\nRouteStack CLI Agent\n"));

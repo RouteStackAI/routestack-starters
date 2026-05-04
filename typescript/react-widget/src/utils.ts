@@ -2,6 +2,7 @@ import { McpToolResult } from "./mcp-client";
 import {
   CarOffer,
   FlightOffer,
+  FlightSegment,
   HotelListing,
   HotelLookupOption,
   HotelRoomOccupancy,
@@ -39,6 +40,47 @@ export function readStringRecord(
   return readString(record, keys);
 }
 
+export function formatIsoDateTime(value?: string) {
+  if (!value) return "Time pending";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+export function formatFlightStops(stops?: number) {
+  if (stops === undefined) return "Stop details pending";
+  if (stops <= 0) return "Nonstop";
+  if (stops === 1) return "1 stop";
+  return `${stops} stops`;
+}
+
+export function formatTravelerSummary(
+  adults: number,
+  children: number,
+  infants: number,
+) {
+  const items = [
+    `${adults} adult${adults === 1 ? "" : "s"}`,
+    children ? `${children} child${children === 1 ? "" : "ren"}` : null,
+    infants ? `${infants} infant${infants === 1 ? "" : "s"}` : null,
+  ].filter(Boolean);
+
+  return items.join(" • ");
+}
+
+export function formatDurationMinutes(minutes?: number) {
+  if (minutes === undefined || minutes <= 0) return undefined;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours && mins) return `${hours}h ${mins}m`;
+  if (hours) return `${hours}h`;
+  return `${mins}m`;
+}
+
 export function readString(record: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = record[key];
@@ -73,6 +115,17 @@ export function readNumber(record: Record<string, unknown>, keys: string[]) {
       const parsed = Number(value.replace(/[^0-9.-]/g, ""));
       if (Number.isFinite(parsed)) return parsed;
     }
+  }
+  return undefined;
+}
+
+export function readArray(
+  record: Record<string, unknown>,
+  keys: string[],
+): unknown[] | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value;
   }
   return undefined;
 }
@@ -206,9 +259,27 @@ export function normalizeLookupOptions(
         "displayName",
         "city",
         "description",
+        "departurelocation",
+        "arrivallocation",
       ]) ?? fallbackLabel,
-    subtitle: readString(item, ["fullName", "country", "region", "address"]),
-    code: readString(item, ["code", "airportCode", "iata", "iataCode"]),
+    subtitle: readString(item, [
+      "fullName",
+      "country",
+      "region",
+      "address",
+      "airport",
+      "airportName",
+      "departairport",
+      "arrivalairport",
+    ]),
+    code: readString(item, [
+      "code",
+      "airportCode",
+      "iata",
+      "iataCode",
+      "departure",
+      "arrival",
+    ]),
     lat: readNumber(item, ["lat", "latitude"]),
     long: readNumber(item, ["long", "lng", "longitude"]),
     raw: item,
@@ -287,40 +358,180 @@ export function normalizeHotelRoomOffers(raw: any): HotelRoomOffer[] {
 
 export function normalizeFlightOffers(raw: unknown): FlightOffer[] {
   const session = findSessionMeta(raw);
-  const records = findRecords(raw, [
-    "flights",
-    "results",
-    "items",
-    "data",
-    "result",
-  ]);
+  const root = firstRecord(raw);
+  const results = root && Array.isArray(root.result) ? root.result : [];
+  const correlationId =
+    readStringRecord(root, ["correlationId", "correlationid"]) ??
+    session.correlationId;
+  const sessionId =
+    readStringRecord(root, ["alphaSessionId", "sessionId", "sessionid"]) ??
+    session.sessionId;
+  const currency =
+    readStringRecord(root, ["currency", "currencyCode"]) ?? "USD";
+  const searchFilterObj = readStringRecord(root, ["searchFilterObj"]);
 
-  return records.slice(0, 10).map((item, index) => ({
-    id:
-      readString(item, ["id", "fareSourceCode", "fareCode"]) ??
-      `flight-${index}`,
-    airline:
-      readString(item, ["airline", "carrier", "carrierName"]) ?? "Airline",
-    flightNumber: readString(item, ["flightNumber", "number"]) ?? "N/A",
-    from: readString(item, ["origin", "from", "departureAirport"]) ?? "Origin",
-    to:
-      readString(item, ["destination", "to", "arrivalAirport"]) ??
-      "Destination",
-    departure:
-      readString(item, ["departure", "departureTime", "departAt"]) ?? "N/A",
-    arrival: readString(item, ["arrival", "arrivalTime", "arriveAt"]) ?? "N/A",
-    duration: readString(item, ["duration"]),
-    price: readNumber(item, ["price", "amount", "total"]),
-    currency: readString(item, ["currency", "currencyCode"]),
-    stops: readNumber(item, ["stops", "stopCount"]),
-    fareSourceCode: readString(item, ["fareSourceCode", "fareCode"]),
-    correlationId:
-      readString(item, ["correlationId", "correlationid"]) ??
-      session.correlationId,
-    sessionId: readString(item, ["sessionId"]) ?? session.sessionId,
-    searchFilterObj: readString(item, ["searchFilterObj"]),
-    raw: item,
-  }));
+  return results
+    .filter(isRecord)
+    .slice(0, 10)
+    .map((item, index) => {
+      const segmentRecords = (readArray(item, ["flights"]) ?? []).filter(isRecord);
+      const segments = segmentRecords.map(normalizeFlightSegment);
+      const firstSegment = segments[0];
+      const lastSegment = segments[segments.length - 1];
+      const totalDurationMinutes =
+        readNumber(item, ["triptime", "totalDuration"]) ??
+        segmentRecords.reduce((sum, segment) => {
+          const duration = readNumber(segment, ["triptime", "duration"]);
+          return sum + (duration ?? 0);
+        }, 0);
+      const stopCount =
+        readNumber(item, ["stops", "stopCount"]) ??
+        Math.max(0, segments.length - 1);
+      const seatValues = segmentRecords
+        .map((segment) => readNumber(segment, ["remainingSeats"]))
+        .filter((value): value is number => value !== undefined);
+      const remainingSeats =
+        readNumber(item, ["remainingSeats"]) ??
+        (seatValues.length ? Math.min(...seatValues) : undefined);
+
+      return {
+        id:
+          readString(item, ["id", "fareSourceCode", "fareCode"]) ??
+          `flight-${index}`,
+        airline: firstSegment?.airline ?? "Airline",
+        airlineCode:
+          firstSegment?.airlineCode ??
+          readString(item, ["airlineCode", "carrierCode", "airline_code"]),
+        airlineLogo: readString(item, [
+          "airlineLogo",
+          "carrierLogo",
+          "logo",
+          "image",
+          "imageUrl",
+        ]),
+        flightNumber:
+          segments.map((segment) => segment.flightNumber).join(", ") || "N/A",
+        from: firstSegment?.departureCity ?? "Origin",
+        to: lastSegment?.arrivalCity ?? "Destination",
+        originCode: firstSegment?.from,
+        destinationCode: lastSegment?.to,
+        originAirport: firstSegment?.departureAirport,
+        destinationAirport: lastSegment?.arrivalAirport,
+        departureCity: firstSegment?.departureCity,
+        arrivalCity: lastSegment?.arrivalCity,
+        departure: formatIsoDateTime(firstSegment?.departureTime),
+        arrival: formatIsoDateTime(lastSegment?.arrivalTime),
+        duration:
+          formatDurationMinutes(totalDurationMinutes) ??
+          readString(item, ["duration"]),
+        durationMinutes: totalDurationMinutes,
+        price: readNumber(item, [
+          "ourprice",
+          "showOurprice",
+          "convertedCoin",
+          "price",
+          "amount",
+          "totalFare",
+        ]),
+        currency,
+        stops: stopCount,
+        cabinClass:
+          firstSegment?.cabinClass ?? readString(item, ["cabinClass", "cabin"]),
+        refundable:
+          readBoolean(item, ["refundable", "isRefundable"]) ??
+          deriveRefundable(item),
+        baggageText: buildBaggageText(item, segments),
+        fareFamily: readString(segmentRecords[0] ?? item, ["fareFamily"]),
+        remainingSeats,
+        layoverSummary: buildLayoverSummary(segments),
+        segments,
+        fareSourceCode: readString(item, ["fareSourceCode", "fareCode"]),
+        correlationId,
+        sessionId:
+          readString(item, ["sessionId"]) ??
+          sessionId,
+        searchFilterObj,
+        raw: item,
+      };
+    });
+}
+
+function normalizeFlightSegment(segment: Record<string, unknown>): FlightSegment {
+  return {
+    airline: readString(segment, ["airline", "carrier", "carrierName"]) ?? "Airline",
+    airlineCode:
+      readString(segment, ["flightCode", "airlineCode", "carrierCode"]) ??
+      readString(segment, ["flightNumber"])?.slice(0, 2),
+    flightNumber:
+      [readString(segment, ["flightCode"]), readString(segment, ["flightNumber"])]
+        .filter(Boolean)
+        .join(" ") || "N/A",
+    from: readString(segment, ["departure", "origin"]) ?? "Origin",
+    to: readString(segment, ["arrival", "destination"]) ?? "Destination",
+    departureCity: readString(segment, ["departurelocation", "departureCity"]),
+    arrivalCity: readString(segment, ["arrivallocation", "arrivalCity"]),
+    departureAirport: readString(segment, ["departairport", "departureAirport"]),
+    arrivalAirport: readString(segment, ["arrivalairport", "arrivalAirport"]),
+    departureTime:
+      readString(segment, ["departureTime", "departure", "departAt"]) ?? "N/A",
+    arrivalTime:
+      readString(segment, ["arrivalTime", "arrival", "arriveAt"]) ?? "N/A",
+    durationMinutes: readNumber(segment, ["triptime", "duration"]),
+    cabinClass: readString(segment, ["cabin", "cabinClass", "class"]),
+  };
+}
+
+function deriveRefundable(item: Record<string, unknown>) {
+  const details = (readArray(item, ["penaltydetails"]) ?? []).filter(isRecord);
+  if (!details.length) return undefined;
+  return details.some((detail) => readBoolean(detail, ["refundAllowed"]) === true);
+}
+
+function buildBaggageText(
+  item: Record<string, unknown>,
+  segments: FlightSegment[],
+) {
+  const explicit = readString(item, [
+    "baggage",
+    "baggageText",
+    "checkedBaggage",
+    "baggageAllowance",
+  ]);
+  if (explicit) return explicit;
+
+  const seats = readNumber(item, ["quantity"]);
+  const fareFamily = readString(item, ["fareFamily"]);
+  const segmentCabin = segments[0]?.cabinClass;
+  const parts = [
+    fareFamily,
+    segmentCabin ? `${segmentCabin} cabin` : null,
+    seats ? `${seats} traveler${seats === 1 ? "" : "s"}` : null,
+  ].filter(Boolean);
+
+  return parts.join(" • ") || undefined;
+}
+
+function buildLayoverSummary(segments: FlightSegment[]) {
+  if (segments.length <= 1) return undefined;
+  const layovers = segments.slice(0, -1).map((segment, index) => {
+    const next = segments[index + 1];
+    const city = segment.arrivalCity ?? segment.to;
+    const duration = differenceInMinutes(segment.arrivalTime, next.departureTime);
+    return duration ? `${city} (${formatDurationMinutes(duration)})` : city;
+  });
+
+  return layovers.join(" • ");
+}
+
+function differenceInMinutes(start?: string, end?: string) {
+  if (!start || !end) return undefined;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return undefined;
+  }
+  const diff = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+  return diff > 0 ? diff : undefined;
 }
 
 export function normalizeCarOffers(raw: unknown): CarOffer[] {
