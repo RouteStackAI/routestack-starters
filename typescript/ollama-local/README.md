@@ -34,9 +34,9 @@ pnpm start
 ## How It Works
 
 ```
-┌─────────────────────┐     Tool Calls     ┌──────────────────────┐
-│   Local Machine      │ ──────────────────→ │  RouteStack MCP      │
-│                      │                     │  (Remote SSE)        │
+┌─────────────────────┐     Tool Calls      ┌──────────────────────┐
+│   Local Machine     │ ──────────────────→ │  RouteStack MCP      │
+│                     │                     │  (Remote SSE)        │
 │  ┌───────────────┐  │     Results         │                      │
 │  │ Ollama        │  │ ←────────────────── │  search_flights()    │
 │  │ (Llama 3.1)   │  │                     │  search_hotels()     │
