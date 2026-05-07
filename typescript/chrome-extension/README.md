@@ -6,7 +6,7 @@ A Chrome extension with a side panel that reads the current webpage context and 
 
 - Node.js >= 20
 - A RouteStack API key ([get one at routestack.ai](https://routestack.ai))
-- An LLM API key (OpenAI or Anthropic)
+- An LLM API key (OpenAI or Anthropic or Mistral)
 - Chrome 114+ (for Side Panel API)
 
 ## Quick Start
@@ -31,6 +31,7 @@ Then load the extension in Chrome:
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
 | `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
 | `OPENAI_API_KEY` | Yes | LLM API key for context extraction |
+| `MISTRAL_API_KEY` | Yes | LLM API key for context extraction |
 
 ## How It Works
 

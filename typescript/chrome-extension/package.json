@@ -5,12 +5,14 @@
   "description": "Chrome extension with RouteStack MCP",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
   "devDependencies": {
-    "tsx": "^4.19.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.7.0"
   }
 }
