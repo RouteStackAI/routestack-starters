@@ -5,12 +5,33 @@
   "description": "Next.js + Vercel AI SDK + RouteStack MCP",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "build": "tsc"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@ai-sdk/mistral": "^1.2.8",
+    "@ai-sdk/openai": "1",
+    "@ai-sdk/react": "1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ai": "4.3.19",
+    "lucide-react": "^0.525.0",
+    "next": "^15.3.5",
+    "openai": "^6.36.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.4.3"
+  },
   "devDependencies": {
-    "tsx": "^4.19.0",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.1.11",
     "typescript": "^5.7.0"
   }
 }

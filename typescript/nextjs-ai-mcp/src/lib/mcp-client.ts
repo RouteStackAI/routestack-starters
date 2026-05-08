@@ -1,14 +1,8 @@
-import { config } from "./config.js";
-
-/**
- * RouteStack MCP Client
- *
- * Connects to the RouteStack MCP server via SSE and provides
- * access to travel tools (flights, hotels, cars).
- *
- * TODO: Replace with actual MCP client implementation when
- * the RouteStack MCP server endpoint is finalized.
- */
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import crypto from "node:crypto";
+import { config } from "./config";
 
 export interface McpTool {
   name: string;
@@ -16,36 +10,129 @@ export interface McpTool {
   inputSchema: Record<string, unknown>;
 }
 
-export interface McpToolResult {
-  content: unknown;
-  isError?: boolean;
+let client: Client | null = null;
+let cachedPartnerToken: string | null = null;
+
+async function getPartnerToken() {
+  if (cachedPartnerToken) return cachedPartnerToken;
+
+  const { apiKey, apiSecret, mcpUrl } = config.routestack;
+
+  if (!apiSecret) return apiKey;
+
+  const ts = Math.floor(Date.now() / 1000);
+  const nonce = crypto.randomUUID();
+
+  const hmac = crypto
+    .createHmac("sha256", apiSecret)
+    .update(`${apiKey}:${ts}:${nonce}`)
+    .digest("base64url");
+
+  const base = new URL(mcpUrl);
+  const tokenUrl = new URL("/mcp/auth/partner-token", base.origin);
+
+  const res = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      apiKey,
+      hmac,
+      timestamp: ts,
+      nonce,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to get partner token");
+  }
+
+  const json = await res.json();
+
+  const token =
+    json.token ||
+    json.accessToken ||
+    json.partnerToken ||
+    json.jwt;
+
+  if (!token) {
+    throw new Error("Partner token missing");
+  }
+
+  cachedPartnerToken = token;
+
+  return token;
 }
 
-export async function connectMcp(): Promise<void> {
-  const { apiKey, mcpUrl } = config.routestack;
+export async function connectMcp() {
+  if (client) return client;
 
-  console.log(`Connecting to RouteStack MCP at ${mcpUrl}...`);
+  const token = await getPartnerToken();
+  const { mcpUrl } = config.routestack;
 
-  // TODO: Initialize MCP client connection via SSE
-  // const client = new McpClient({ url: mcpUrl, apiKey });
-  // await client.connect();
+  client = new Client({
+    name: "routestack-next-chat",
+    version: "0.1.0",
+  });
 
-  console.log("Connected to RouteStack MCP server.");
+  try {
+    const transport = new StreamableHTTPClientTransport(
+      new URL(mcpUrl),
+      {
+        requestInit: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
+    await client.connect(transport);
+  } catch {
+    await client.close().catch(() => {});
+    client = new Client({
+      name: "routestack-next-chat",
+      version: "0.1.0",
+    });
+
+    const transport = new SSEClientTransport(
+      new URL(mcpUrl),
+      {
+        requestInit: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+
+    await client.connect(transport);
+  }
+
+  return client;
 }
 
 export async function listTools(): Promise<McpTool[]> {
-  // TODO: Fetch available tools from MCP server
-  return [];
+  const client = await connectMcp();
+
+  const result = await client.listTools();
+
+  return result.tools.map((t) => ({
+    name: t.name,
+    description: t.description || "",
+    inputSchema: (t.inputSchema || {}) as Record<string, unknown>,
+  }));
 }
 
-export async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  // TODO: Call MCP tool and return result
-  console.log(`Calling tool: ${name}`, args);
-  return { content: null };
-}
+export async function callTool(
+  name: string,
+  args: Record<string, unknown>
+) {
+  const client = await connectMcp();
 
-export async function disconnectMcp(): Promise<void> {
-  // TODO: Gracefully close MCP connection
-  console.log("Disconnected from RouteStack MCP server.");
-}
+  const result = await client.callTool({
+    name,
+    arguments: args,
+  });
 
+  return result;
+}

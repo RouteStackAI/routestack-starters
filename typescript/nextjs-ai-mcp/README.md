@@ -6,11 +6,12 @@ A Next.js App Router application using the Vercel AI SDK (`useChat`) wired to Ro
 
 - Node.js >= 20
 - A RouteStack API key ([get one at routestack.ai](https://routestack.ai))
-- An LLM API key (OpenAI or Anthropic)
+- An LLM API key (Mistral)
 
 ## Quick Start
 
 ```bash
+cd typescript/nextjs-ai-mcp
 cp .env.example .env
 # Add your API keys to .env
 pnpm install
@@ -22,9 +23,9 @@ pnpm dev
 | Variable | Required | Description |
 |:---------|:---------|:------------|
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
-| `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `OPENAI_API_KEY` | Yes* | OpenAI API key (*or use Anthropic) |
-| `ANTHROPIC_API_KEY` | Yes* | Anthropic API key (*or use OpenAI) |
+| `ROUTESTACK_MCP_URL` | No | MCP server endpoint (defaults to `https://mcp.routestack.ai/sse`) |
+| `MISTRAL_API_KEY` | Yes* | Mistral API key (*or use OpenAI) |
+| `MISTRAL_MODEL` | No | Mistral LLM model (defaults to `mistral-small-latest`) |
 
 ## How It Works
 

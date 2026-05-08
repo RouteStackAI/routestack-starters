@@ -1,3 +1,5 @@
 typescript/**/node_modules
 
 typescript/**/.env
+
+typescript/nextjs-ai-mcp/.next

@@ -1,14 +1,12 @@
-import "dotenv/config";
-
 export const config = {
   routestack: {
-    apiKey: process.env.ROUTESTACK_API_KEY ?? "",
-    mcpUrl: process.env.ROUTESTACK_MCP_URL ?? "https://mcp.routestack.ai/sse",
+    apiKey: process.env.ROUTESTACK_API_KEY || "",
+    apiSecret: process.env.ROUTESTACK_API_SECRET || "",
+    mcpUrl: process.env.ROUTESTACK_MCP_URL || "",
   },
-} as const;
 
-if (!config.routestack.apiKey) {
-  console.error("Error: ROUTESTACK_API_KEY is required. Set it in your .env file.");
-  process.exit(1);
-}
-
+  mistral: {
+    apiKey: process.env.MISTRAL_API_KEY || "",
+    model: process.env.MISTRAL_MODEL || "mistral-small-latest",
+  },
+};
