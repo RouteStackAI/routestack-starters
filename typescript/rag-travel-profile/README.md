@@ -25,7 +25,14 @@ pnpm start
 |:---------|:---------|:------------|
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
 | `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `OPENAI_API_KEY` | Yes | For embeddings and chat |
+| `LLM_PROVIDER` | Yes | `openai` or `anthropic`, or `mistral` |
+| `OPENAI_API_KEY` | If using OpneAI | OpneAI API key |
+| `OPENAI_MODEL` | No | OpenAI model (default: `gpt-4.1-mini`) |
+| `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | Anthropic model (default: `claude-sonnet-4-5-latest`) |
+| `MISTRAL_API_KEY` | If using Mistral | Mistral API key |
+| `MISTRAL_MODEL` | No | Mistral model (default: `mistral-large-latest`) |
+| `MISTRAL_BASE_URL` | No | Mistral API base URL (default: `https://api.mistral.ai/v1`) |
 | `PINECONE_API_KEY` | Yes* | Pinecone key (*or use Chroma) |
 | `PINECONE_INDEX` | Yes* | Pinecone index name |
 | `CHROMA_URL` | No | Chroma URL for local alternative |

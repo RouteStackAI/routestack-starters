@@ -12,6 +12,7 @@ export async function runPlannerAgent(
   const context: ToolExecutionContext = {
     hotel: {},
     flight: {},
+    car: {}
   };
 
   const [flight, hotel, car] = await Promise.all([

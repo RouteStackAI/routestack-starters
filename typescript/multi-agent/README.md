@@ -23,7 +23,9 @@ pnpm start
 |:---------|:---------|:------------|
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
 | `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `LLM_PROVIDER` | No | `anthropic`, or `mistral` |
+| `LLM_PROVIDER` | Yes | `openai` or `anthropic`, or `mistral` |
+| `OPENAI_API_KEY` | If using OpneAI | OpneAI API key |
+| `OPENAI_MODEL` | No | OpenAI model (default: `gpt-4.1-mini`) |
 | `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
 | `ANTHROPIC_MODEL` | No | Anthropic model (default: `claude-sonnet-4-5-latest`) |
 | `MISTRAL_API_KEY` | If using Mistral | Mistral API key |
