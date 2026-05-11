@@ -23,7 +23,12 @@ pnpm start
 |:---------|:---------|:------------|
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
 | `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude |
+| `LLM_PROVIDER` | No | `anthropic`, or `mistral` |
+| `ANTHROPIC_API_KEY` | If using Anthropic | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | Anthropic model (default: `claude-sonnet-4-5-latest`) |
+| `MISTRAL_API_KEY` | If using Mistral | Mistral API key |
+| `MISTRAL_MODEL` | No | Mistral model (default: `mistral-large-latest`) |
+| `MISTRAL_BASE_URL` | No | Mistral API base URL (default: `https://api.mistral.ai/v1`) |
 
 ## How It Works
 
