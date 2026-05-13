@@ -1,16 +1,38 @@
 {
-  "name": "@routestack/n8n-mcp-node",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Custom n8n node for RouteStack MCP",
+  "name": "n8n-nodes-routestack",
+  "version": "0.3.0",
+  "description": "RouteStack MCP community node for n8n",
+  "license": "MIT",
   "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "n8n-community-node-package"
+  ],
   "scripts": {
-    "start": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc && npm run copy-assets",
+    "dev": "tsc -w",
+    "copy-assets": "copyfiles -u 1 \"nodes/RouteStack/*.svg\" dist/nodes"
   },
-  "dependencies": {},
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/RouteStackApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/RouteStack/RouteStack.node.js"
+    ]
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
   "devDependencies": {
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^22.15.21",
+    "copyfiles": "^2.4.1",
+    "n8n-core": "^1.91.0",
+    "n8n-workflow": "^1.91.0",
+    "typescript": "^5.8.3"
   }
 }

@@ -26,6 +26,7 @@ Add your RouteStack credentials in n8n's Credentials UI:
 | Field | Description |
 |:------|:------------|
 | API Key | Your RouteStack API key |
+| API Secret | Your RouteStack API secret |
 | MCP URL | MCP server endpoint (`https://mcp.routestack.ai/sse`) |
 
 ## Available Actions

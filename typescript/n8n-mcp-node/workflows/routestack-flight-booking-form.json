@@ -1,0 +1,379 @@
+{
+  "name": "Flight Booking Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "routestack-flight-booking",
+        "formTitle": "RouteStack Flight Booking",
+        "formDescription": "Search flights and generate booking payment link.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Origin",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Destination",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Departure Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Return Date",
+              "fieldType": "date"
+            },
+            {
+              "fieldLabel": "Adults",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Cabin Class",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Economy"
+                  },
+                  {
+                    "option": "Premium Economy"
+                  },
+                  {
+                    "option": "Business"
+                  },
+                  {
+                    "option": "First"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "58c9e6d6-5923-4480-b033-6494b49c7601",
+      "name": "Flight Booking Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        380
+      ],
+      "webhookId": "flight-booking-flow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $json;\n\nreturn [{\n  json: {\n    origin: v.Origin,\n    destination: v.Destination,\n    departureDate: v['Departure Date'],\n    returnDate: v['Return Date'] || '',\n    adults: Number(v.Adults || 1),\n    children: Number(v.Children || 0),\n    infants: Number(v.Infants || 0),\n    cabinClass: String(v['Cabin Class'] || 'Economy'),\n    flightIndex: Math.max(0, Number(v['Flight Index'] || 0))\n  }\n}];"
+      },
+      "id": "7b24555f-5665-406b-8a75-e0f35c286fb3",
+      "name": "Normalize Flight Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "flight_session"
+      },
+      "id": "1cabc4dd-4067-44e5-9140-7e4255ad294e",
+      "name": "Flight Session",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        440,
+        380
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "flight_locations",
+        "toolArgs": "={\"term\":\"{{$('Normalize Flight Input').item.json.origin}}\"}"
+      },
+      "id": "88cecc5c-b9de-4968-82b0-c6d29cbf7bbc",
+      "name": "Search Origin",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        660,
+        380
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "flight_locations",
+        "toolArgs": "={\"term\":\"{{$('Normalize Flight Input').item.json.destination}}\"}"
+      },
+      "id": "c4786dae-ecc7-4a33-84ef-a5f3a246c884",
+      "name": "Search Destination",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        900,
+        380
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $items('Normalize Flight Input', 0, 0)[0].json;\n\nconst originRaw = $items('Search Origin', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst destinationRaw = $items('Search Destination', 0, 0)[0].json.response?.[0]?.text || '{}';\n\nlet originParsed = {};\nlet destinationParsed = {};\n\ntry {\n  originParsed = JSON.parse(originRaw);\n} catch {}\n\ntry {\n  destinationParsed = JSON.parse(destinationRaw);\n} catch {}\n\nconst originList = originParsed.result || originParsed.data || [];\nconst destinationList = destinationParsed.result || destinationParsed.data || [];\n\nconst origin = Array.isArray(originList) ? originList[0] : null;\nconst destination = Array.isArray(destinationList) ? destinationList[0] : null;\n\nif (!origin) {\n  throw new Error('Origin airport not found');\n}\n\nif (!destination) {\n  throw new Error('Destination airport not found');\n}\n\nconst originCode = origin.iata || origin.code || origin.airportCode;\nconst destinationCode = destination.iata || destination.code || destination.airportCode;\n\nreturn [{\n  json: {\n    originCode,\n    destinationCode,\n    originData: origin,\n    destinationData: destination,\n    departureDate: form.departureDate,\n    returnDate: form.returnDate,\n    adults: form.adults,\n    children: form.children,\n    infants: form.infants,\n    cabinClass: form.cabinClass,\n    flightIndex: form.flightIndex\n  }\n}];"
+      },
+      "id": "7936474a-ece5-4bc3-822e-d29fe1f70d01",
+      "name": "Prepare Flight Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        60,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "flight_search",
+        "toolArgs": "={\n  \"filter\": {\n    \"origin\": \"{{$json.originCode}}\",\n    \"destination\": \"{{$json.destinationCode}}\",\n    \"departureDate\": \"{{$json.departureDate}}\",\n    \"returnDate\": \"{{$json.returnDate}}\",\n    \"adults\": {{$json.adults}},\n    \"cabinClass\": \"{{$json.cabinClass}}\",\n    \"tripType\": \"{{$json.returnDate ? \"round_trip\" : \"one_way\"}}\",\n    \"originLocation\": {{ $json.originData.toJsonString() }},\n    \"destinationLocation\": {{ $json.destinationData.toJsonString() }}\n  }\n}\n"
+      },
+      "id": "e766220d-5cc0-4c9d-8323-49ef18036ef4",
+      "name": "Flight Search",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        300,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $items('Prepare Flight Search', 0, 0)[0].json;\n\nconst raw = $json.response?.[0]?.text || '{}';\n\nlet parsed = {};\n\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  throw new Error('Invalid flight_search response JSON');\n}\n\n// Your actual response structure:\n// {\n//   count,\n//   result: [...],\n//   correlationId,\n//   searchFilterObj,\n//   alphaSessionId\n// }\n\nconst flights =\n  parsed.result ||\n  parsed.data ||\n  parsed.flights ||\n  [];\n\nif (!Array.isArray(flights) || flights.length === 0) {\n  throw new Error('No flights found');\n}\n\nconst index = Math.min(\n  Number(ctx.flightIndex || 0),\n  flights.length - 1\n);\n\nconst selectedFlight = flights[index];\n\nconst fareSourceCode =\n  selectedFlight.fareSourceCode ||\n  selectedFlight.id ||\n  '';\n\nif (!fareSourceCode) {\n  throw new Error('fareSourceCode missing');\n}\n\nreturn [\n  {\n    json: {\n      ...ctx,\n\n      // Session / correlation\n      correlationId:\n        parsed.correlationId || '',\n\n      searchFilterObj:\n        parsed.searchFilterObj || '',\n\n      sessionId:\n        parsed.alphaSessionId ||\n        selectedFlight.sessionId ||\n        '',\n\n      // Selected flight\n      selectedFlight,\n\n      fareSourceCode,\n\n      // Pricing\n      searchListPrice:\n        Number(\n          selectedFlight.ourprice ||\n          selectedFlight.totalFare ||\n          selectedFlight.baseFare ||\n          0\n        ),\n\n      currency:\n        parsed.currency || 'USD',\n\n      totalResults:\n        parsed.count || flights.length\n    }\n  }\n];"
+      },
+      "id": "ac7dbcc9-9e76-4139-a45c-7ce3ae08b49f",
+      "name": "Prepare Flight Selection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "flight_revalidate",
+        "toolArgs": "={\n  \"fareSourceCode\": \"{{$json.fareSourceCode}}\",\n  \"searchListPrice\": {{$json.searchListPrice}},\n  \"searchFilterObj\": {{$json.searchFilterObj.toJsonString()}},\n  \"correlationId\": \"{{$json.correlationId}}\"\n}\n"
+      },
+      "id": "a097705b-fc8e-4194-89ef-d6c259e57cdc",
+      "name": "Flight Revalidate",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        780,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "flight_get_payment_url",
+        "toolArgs": "={{\n(() => {\n  const search = $('Prepare Flight Search').item.json;\n\n  const body = {\n    flight: $('Prepare Flight Selection').item.json.selectedFlight,\n    origin: search.originCode,\n    destination: search.destinationCode,\n    departureDate: search.departureDate,\n    adults: search.adults,\n    correlationId: $('Flight Search').item.json.response[0].text.parseJson().correlationId,\n    searchFilterObj: $('Flight Search').item.json.response[0].text.parseJson().searchFilterObj,\n    sessionId: $('Flight Session').item.json.response[0].text.parseJson().sessionId\n  };\n\n  if (search.returnDate) {\n    body.returnDate = search.returnDate;\n  }\n\n  return JSON.stringify(body, null, 2);\n})()\n}}"
+      },
+      "id": "d1f5f6a6-be06-4b13-9dd3-46501078d5a0",
+      "name": "Get Flight Payment URL",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const paymentRaw = $json.response?.[0]?.text || '{}';\nconst revalidateRaw = $items('Flight Revalidate', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst flightCtx = $items('Prepare Flight Selection', 0, 0)[0].json;\n\nlet payment = {};\nlet revalidated = {};\n\ntry {\n  payment = JSON.parse(paymentRaw);\n} catch {}\n\ntry {\n  revalidated = JSON.parse(revalidateRaw);\n} catch {}\n\nreturn [{\n  json: {\n    success: true,\n    origin: flightCtx.originCode,\n    destination: flightCtx.destinationCode,\n    departureDate: flightCtx.departureDate,\n    returnDate: flightCtx.returnDate,\n    flight: flightCtx.selectedFlight,\n    revalidated,\n    payment\n  }\n}];"
+      },
+      "id": "0bd6370b-781d-4de7-9642-9cdfe9e1f295",
+      "name": "Build Flight Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## RouteStack Flight Booking Flow\n\nThis workflow calls RouteStack flight tools in sequence:\n\n1. `flight_session`\n2. `flight_locations`\n3. `flight_search`\n4. `flight_revalidate`\n5. `flight_get_payment_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports flight APIs\n- Update tool arguments if your API expects additional parameters",
+        "height": 360,
+        "width": 760,
+        "color": 5
+      },
+      "id": "e0ff87fc-f714-4869-a432-5c3a757a0574",
+      "name": "Flight Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Flight Booking Form": {
+      "main": [
+        [
+          {
+            "node": "Normalize Flight Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Flight Input": {
+      "main": [
+        [
+          {
+            "node": "Flight Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flight Session": {
+      "main": [
+        [
+          {
+            "node": "Search Origin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Origin": {
+      "main": [
+        [
+          {
+            "node": "Search Destination",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Destination": {
+      "main": [
+        [
+          {
+            "node": "Prepare Flight Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Flight Search": {
+      "main": [
+        [
+          {
+            "node": "Flight Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flight Search": {
+      "main": [
+        [
+          {
+            "node": "Prepare Flight Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Flight Selection": {
+      "main": [
+        [
+          {
+            "node": "Flight Revalidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flight Revalidate": {
+      "main": [
+        [
+          {
+            "node": "Get Flight Payment URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Flight Payment URL": {
+      "main": [
+        [
+          {
+            "node": "Build Flight Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "33d55afa-2a35-43cc-9a02-90c99a8084f5",
+  "meta": {
+    "instanceId": "9abaec768e7e948bbb8d6bfea3c8051178bc7ed59c595ca9b486cc8e9f8f8de2"
+  },
+  "id": "5b7zjF1ALFjJ4HAz",
+  "tags": []
+}

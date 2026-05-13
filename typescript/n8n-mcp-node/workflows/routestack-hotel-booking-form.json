@@ -1,0 +1,390 @@
+{
+  "name": "Hotel Booking Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "routestack-hotel-booking",
+        "formTitle": "RouteStack Hotel Booking",
+        "formDescription": "Submit trip details and get a hotel payment link.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Destination",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Check-in Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Check-out Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Adults",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Children",
+              "fieldType": "number"
+            },
+            {
+              "fieldLabel": "Rooms",
+              "fieldType": "number",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "269da319-5746-4ef7-a9e3-7f4e8f66521a",
+      "name": "Hotel Booking Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        20,
+        340
+      ],
+      "webhookId": "238b639c-16f6-48f4-9e86-b683d656acfc"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $json;\nreturn [{\n  json: {\n    destination: v.Destination,\n    checkin: v['Check-in Date'],\n    checkout: v['Check-out Date'],\n    adults: Number(v.Adults || 1),\n    children: Number(v.Children || 0),\n    rooms: Number(v.Rooms || 1),\n    nationality: String(v.Nationality || 'IN'),\n    currency: String(v.Currency || 'USD'),\n    hotelIndex: Math.max(0, Number(v['Hotel Index'] || 0)),\n    roomIndex: Math.max(0, Number(v['Room Index'] || 0))\n  }\n}];"
+      },
+      "id": "9a1f33b5-3733-4884-bc4c-f857d7854b1c",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "search_destinations",
+        "toolArgs": "={\n    \"query\": \"{{$json.destination}}\",\n    \"type\": \"DESTINATION\"\n}"
+      },
+      "id": "cb78400b-9bbb-482d-b280-5145268da45a",
+      "name": "Search Destinations",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        480,
+        340
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $items('Normalize Input', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst list = parsed.result || parsed.data || parsed.destinations || [];\nconst destination = Array.isArray(list) ? list[0] : null;\nconst destinationId = destination?.id || destination?.code || destination?.destinationId;\n\nconst today = new Date();\ntoday.setDate(today.getDate() + 30)\nconst checkInDate = today.toISOString().split(\"T\")[0];\ntoday.setDate(today.getDate() + 1)\nconst checkOutDate = today.toISOString().split(\"T\")[0];\nif (!destinationId) {\n  throw new Error('No destinationId found from search_destinations response');\n}\n\nreturn {\n    \"destinationId\": destinationId,\n    \"checkIn\": form.checkin || checkInDate,\n    \"checkOut\": form.checkout || checkOutDate,\n    \"rooms\": [{\n      adults: form.adults\n    }],\n    \"lat\": destination.coordinates.lat,\n    \"long\": destination.coordinates.long,\n    \"currency\": form.currency\n}"
+      },
+      "id": "8c78ffb2-b406-4a31-8528-63886bf58b9b",
+      "name": "Prepare Hotel Search Args",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "search_hotels",
+        "toolArgs": "={\n    \"destinationId\": \"{{$json.destinationId}}\",\n    \"checkIn\": \"{{$json.checkIn}}\",\n    \"checkOut\": \"{{$json.checkOut}}\",\n    \"rooms\": [\n      {\n        \"adults\": {{$json.rooms[0].adults}}\n      }\n    ],\n    \"lat\": {{$json.lat}},\n    \"long\": {{$json.long}},\n    \"currency\": \"{{$json.currency || \"USD\"}}\"\n  }"
+      },
+      "id": "534257e3-33f8-4920-950e-86940d458b89",
+      "name": "Search Hotels",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        920,
+        340
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $items('Prepare Hotel Search Args', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst token = parsed?.result?.token;\nconst correlationId = parsed?.result?.correlationId;\nconst hotels = parsed?.result?.result || [];\nif (!Array.isArray(hotels) || hotels.length === 0) {\n  throw new Error('No hotels found');\n}\nconst index = Math.min(ctx.hotelIndex || 0, hotels.length - 1);\nconst selectedHotel = hotels[index];\nconst hotelId = selectedHotel?.id || selectedHotel?.hotelId;\nif (!hotelId) {\n  throw new Error('No hotelId found in selected hotel');\n}\nreturn [{\n  json: {\n    ...ctx,\n    token,\n    correlationId,\n    hotelId,\n    hotelName: selectedHotel?.name || '',\n    selectedHotel\n  }\n}];"
+      },
+      "id": "67be7279-bb02-4d85-af85-c7555d6143f2",
+      "name": "Prepare Hotel Selection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "get_hotel_details",
+        "toolArgs": "={\"hotelId\": \"{{$json.hotelId}}\"}"
+      },
+      "id": "6ac56cca-ecea-48fb-81a2-61cdf93e6583",
+      "name": "Get Hotel Details",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        260,
+        580
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "get_rooms_and_rates",
+        "toolArgs": "={\n    \"hotelId\": \"{{$json.args.parseJson().hotelId}}\",\n    \"token\": \"{{$('Search Hotels').item.json.response[0].text.parseJson().result.token}}\",\n    \"correlationId\": \"{{$('Search Hotels').item.json.response[0].text.parseJson().result.correlationId}}\",\n    \"checkIn\": \"{{$('Search Hotels').item.json.args.parseJson().checkIn}}\",\n    \"checkOut\": \"{{$('Search Hotels').item.json.args.parseJson().checkOut}}\",\n    \"rooms\": [\n        {\n            \"adults\": {{$('Search Hotels').item.json.args.parseJson().rooms[0].adults}},\n            \"children\": 0\n        }\n    ],\n    \"hotelName\": \"{{ $json.response[0].text.parseJson().result.name }}\",\n    \"publishedRate\": {{$('Search Hotels').item.json.response[0].text.parseJson().result.result[0].ourprice}}\n}"
+      },
+      "id": "ab828112-2167-4b63-9fd3-b1f9fe4abe57",
+      "name": "Get Rooms and Rates",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        500,
+        580
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $items('Prepare Hotel Selection', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst groups = parsed?.result?.groups || [];\nconst rooms = groups.flatMap(g => g.rooms || []);\nif (!rooms.length) {\n  throw new Error('No rooms found for selected hotel');\n}\nconst index = Math.min(ctx.roomIndex || 0, rooms.length - 1);\nconst room = rooms[index];\nconst roomId = room?.id;\nconst recommendationId = room?.recommendationId;\nconst publishedRate = room?.publishedRate;\nif (!roomId || !recommendationId) {\n  throw new Error('Missing roomId/recommendationId for revalidate');\n}\nreturn [{\n  json: {\n    ...ctx,\n    roomId,\n    recommendationId,\n    publishedRate,\n    selectedRoom: room\n  }\n}];"
+      },
+      "id": "80e39bd9-3c2d-415a-beb8-e098ae8b6cc6",
+      "name": "Prepare Revalidate Args",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "revalidate",
+        "toolArgs": "={\n    \"hotelId\": \"{{$json.hotelId}}\",\n    \"recommendationId\": \"{{$json.recommendationId}}\",\n    \"token\": \"{{$json.token}}\",\n    \"correlationId\": \"{{$json.correlationId}}\",\n    \"publishedRate\": {{$json.publishedRate}}\n}"
+      },
+      "id": "8bee0f9c-7e8f-47b6-8956-f21b02f1bc45",
+      "name": "Revalidate",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        940,
+        580
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "hotel_get_payment_url",
+        "toolArgs": "={\n    \"hotelId\": \"{{JSON.parse($json.response[0].text).result.hotelId}}\",\n    \"recommendationId\": \"{{$json.args.parseJson().recommendationId}}\",\n    \"token\": \"{{$json.args.parseJson().token}}\",\n    \"checkIn\": \"{{$('Get Rooms and Rates').item.json.args.parseJson().checkIn}}\",\n    \"checkOut\": \"{{$('Get Rooms and Rates').item.json.args.parseJson().checkOut}}\",\n    \"roomId\": \"{{JSON.parse($json.response[0].text).result.room[0].id}}\",\n    \"hotelName\": \"{{$('Prepare Revalidate Args').item.json.hotelName}}\",\n    \"hotelAddress\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.contact.address.city.name}}\",\n    \"hotelImage\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.heroImage || $('Get Hotel Details').item.json.response[0].text.parseJson().result.heroImage || \"\"}}\",\n    \"hotelLatitude\": {{$('Prepare Revalidate Args').item.json.lat}},\n    \"hotelLongitude\": {{$('Prepare Revalidate Args').item.json.long}},\n    \"hotelStarRating\": {{$('Prepare Revalidate Args').item.json.selectedHotel.starRating}},\n    \"hotelRating\": {{$('Prepare Revalidate Args').item.json.selectedHotel.starRating}},\n    \"correlationId\": \"{{$json.args.parseJson().correlationId}}\",\n    \"travellers\": \"Room 1: {{$('Prepare Revalidate Args').item.json.rooms[0].adults}}A/0C\",\n    \"destination\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.contact.address.city.name}}\",\n    \"displayedPrice\": {{JSON.parse($json.response[0].text).result.rate[0].publishedRate}},\n    \"priceCheckResult\": {{$json.response[0].text}}\n}"
+      },
+      "id": "d513b9b1-1da6-4212-b35c-92db958905c1",
+      "name": "Get Payment URL",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        580
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const hotelCtx = $items('Prepare Hotel Selection', 0, 0)[0].json;\nconst detailText = $items('Get Hotel Details', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst revalidateText = $items('Revalidate', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst paymentText = $json.response?.[0]?.text || '{}';\nlet details = {}; let revalidated = {}; let payment = {};\ntry { details = JSON.parse(detailText); } catch {}\ntry { revalidated = JSON.parse(revalidateText); } catch {}\ntry { payment = JSON.parse(paymentText); } catch {}\nreturn [{\n  json: {\n    success: true,\n    destination: hotelCtx.destination,\n    hotel: {\n      id: hotelCtx.hotelId,\n      name: hotelCtx.hotelName,\n      details\n    },\n    room: hotelCtx.selectedRoom,\n    revalidated,\n    payment\n  }\n}];"
+      },
+      "id": "87d92360-d4da-4ab4-b5e5-fab47165b262",
+      "name": "Build Final Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Form-based Hotel Booking Flow\n\nThis workflow calls RouteStack hotel tools in sequence:\n1. `search_destinations`\n2. `search_hotels`\n3. `get_hotel_details`\n4. `get_rooms_and_rates`\n5. `revalidate`\n6. `hotel_get_payment_url`\n\nBefore activating:\n- Set credentials on every RouteStack node\n- Replace `YOUR_ROUTESTACK_CREDENTIAL_ID` with your credential id\n- If your MCP server expects additional args, add them in toolArgs JSON expressions",
+        "height": 360,
+        "width": 760,
+        "color": 7
+      },
+      "id": "601725d0-1603-4b36-8793-199cb8aabe46",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -60
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Hotel Booking Form": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Search Destinations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Destinations": {
+      "main": [
+        [
+          {
+            "node": "Prepare Hotel Search Args",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Hotel Search Args": {
+      "main": [
+        [
+          {
+            "node": "Search Hotels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Hotels": {
+      "main": [
+        [
+          {
+            "node": "Prepare Hotel Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Hotel Selection": {
+      "main": [
+        [
+          {
+            "node": "Get Hotel Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rooms and Rates": {
+      "main": [
+        [
+          {
+            "node": "Prepare Revalidate Args",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Revalidate Args": {
+      "main": [
+        [
+          {
+            "node": "Revalidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revalidate": {
+      "main": [
+        [
+          {
+            "node": "Get Payment URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Payment URL": {
+      "main": [
+        [
+          {
+            "node": "Build Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Hotel Details": {
+      "main": [
+        [
+          {
+            "node": "Get Rooms and Rates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "42110fe1-956e-4008-b497-1ea63d086119",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9abaec768e7e948bbb8d6bfea3c8051178bc7ed59c595ca9b486cc8e9f8f8de2"
+  },
+  "id": "EHfsxqvoG9720Dbv",
+  "tags": []
+}

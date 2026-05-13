@@ -3,3 +3,5 @@ typescript/**/node_modules
 typescript/**/.env
 
 typescript/nextjs-ai-mcp/.next
+
+typescript/n8n-mcp-node/dist

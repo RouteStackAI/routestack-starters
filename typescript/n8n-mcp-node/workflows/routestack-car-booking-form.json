@@ -1,0 +1,329 @@
+{
+  "name": "Car Booking Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "routestack-car-booking",
+        "formTitle": "RouteStack Car Booking",
+        "formDescription": "Search rental cars and generate booking payment link.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Pickup Location",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Dropoff Location",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Pickup Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Dropoff Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Driver Age",
+              "fieldType": "number",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "13a0c9b1-f778-4e7e-b772-3dd5c7f74601",
+      "name": "Car Booking Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        380
+      ],
+      "webhookId": "car-booking-flow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $json;\n\nreturn [{\n  json: {\n    pickup: v['Pickup Location'],\n    dropoff: v['Dropoff Location'],\n    pickupDate: v['Pickup Date'],\n    dropoffDate: v['Dropoff Date'],\n    driverAge: Number(v['Driver Age'] || 30),\n    carIndex: Math.max(0, Number(v['Car Index'] || 0))\n  }\n}];"
+      },
+      "id": "ec4dcff4-1dbf-4958-a6fc-4f7b2c9a1001",
+      "name": "Normalize Car Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "car_locations",
+        "toolArgs": "={\"term\":\"{{$('Normalize Car Input').item.json.pickup}}\"}"
+      },
+      "id": "5dfbc5a5-6636-4d93-a37e-52f1f0c33002",
+      "name": "Search Pickup Location",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        460,
+        380
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "car_locations",
+        "toolArgs": "={\"term\":\"{{$('Normalize Car Input').item.json.dropoff}}\"}"
+      },
+      "id": "08fcb447-0a73-4f0f-9790-8a1dd64f1003",
+      "name": "Search Dropoff Location",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        700,
+        380
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $items('Normalize Car Input', 0, 0)[0].json;\n\nconst pickupRaw = $items('Search Pickup Location', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst dropoffRaw = $items('Search Dropoff Location', 0, 0)[0].json.response?.[0]?.text || '{}';\n\nlet pickupParsed = {};\nlet dropoffParsed = {};\n\ntry {\n  pickupParsed = JSON.parse(pickupRaw);\n} catch {}\n\ntry {\n  dropoffParsed = JSON.parse(dropoffRaw);\n} catch {}\n\nconst pickupList = pickupParsed.result || pickupParsed.data || [];\nconst dropoffList = dropoffParsed.result || dropoffParsed.data || [];\n\nconst pickupLocation = Array.isArray(pickupList) ? pickupList[0] : null;\nconst dropoffLocation = Array.isArray(dropoffList) ? dropoffList[0] : null;\n\nif (!pickupLocation) {\n  throw new Error('Pickup location not found');\n}\n\nif (!dropoffLocation) {\n  throw new Error('Dropoff location not found');\n}\n\nconst pickupCode = pickupLocation.code || pickupLocation.iata || pickupLocation.id;\nconst dropoffCode = dropoffLocation.code || dropoffLocation.iata || dropoffLocation.id;\n\nreturn [{\n  json: {\n    pickupCode,\n    dropoffCode,\n    pickupLocation,\n    dropoffLocation,\n    pickupDate: form.pickupDate,\n    dropoffDate: form.dropoffDate,\n    driverAge: form.driverAge,\n    carIndex: form.carIndex\n  }\n}];"
+      },
+      "id": "709d74a4-7ff8-47f7-89fd-f41d2d611004",
+      "name": "Prepare Car Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "car_search",
+        "toolArgs": "={\n  \"filter\": {\n    \"pickup\": \"{{$json.pickupCode}}\",\n    \"dropoff\": \"{{$json.dropoffCode}}\",\n    \"pickupDate\": \"{{$json.pickupDate}}\",\n    \"dropoffDate\": \"{{$json.dropoffDate}}\",\n    \"driverAge\": {{$json.driverAge}},\n    \"pickupLocation\": {{ $json.pickupLocation.toJsonString() }},\n    \"dropoffLocation\": {{ $json.dropoffLocation.toJsonString() }}\n  }\n}"
+      },
+      "id": "3c8bbf67-cad8-4427-87c4-708f4f691005",
+      "name": "Car Search",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        340,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $items('Prepare Car Search', 0, 0)[0].json;\n\nconst raw = $json.response?.[0]?.text || '{}';\n\nlet parsed = {};\n\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  throw new Error('Invalid car_search response JSON');\n}\n\nconst cars =\n  parsed.result ||\n  parsed.data ||\n  parsed.cars ||\n  [];\n\nif (!Array.isArray(cars) || cars.length === 0) {\n  throw new Error('No cars found');\n}\n\nconst index = Math.min(\n  Number(ctx.carIndex || 0),\n  cars.length - 1\n);\n\nconst selectedCar = cars[index];\n\nconst fareCode =\n  selectedCar.fareCode ||\n  selectedCar.rateCode ||\n  selectedCar.id ||\n  '';\n\nif (!fareCode) {\n  throw new Error('fareCode missing');\n}\n\nreturn [\n  {\n    json: {\n      ...ctx,\n      correlationId:\n        parsed.correlationId || '',\n\n      selectedCar,\n\n      fareCode,\n\n      currency:\n        parsed.currency || 'USD',\n\n      totalResults:\n        parsed.count || cars.length\n    }\n  }\n];"
+      },
+      "id": "2e3910c5-6e1c-4d43-9fd9-fb22763b1006",
+      "name": "Prepare Car Selection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "toolName": "car_revalidate",
+        "toolArgs": "={\n  \"fareCode\": \"{{$json.fareCode}}\",\n  \"correlationId\": \"{{$json.correlationId}}\"\n}"
+      },
+      "id": "fcdd77d8-2a62-4c8c-b7a9-0d3145c21007",
+      "name": "Car Revalidate",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        820,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolName": "car_get_payment_url",
+        "toolArgs": "={{\n(() => {\n  const search = $('Prepare Car Search').item.json;\n\n  const body = {\n    pickup: search.pickupCode,\n    dropoff: search.dropoffCode,\n    pickupDate: search.pickupDate,\n    dropoffDate: search.dropoffDate,\n    car: $('Prepare Car Selection').item.json.selectedCar\n  };\n\n  return JSON.stringify(body, null, 2);\n})()\n}}"
+      },
+      "id": "b7ab93f5-2cb8-4d9e-84e8-88664fd51008",
+      "name": "Get Car Payment URL",
+      "type": "CUSTOM.routeStack",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        620
+      ],
+      "credentials": {
+        "routeStackApi": {
+          "id": "0Rt0Cq5Bw4WRdjBM",
+          "name": "RouteStack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const paymentRaw = $json.response?.[0]?.text || '{}';\nconst revalidateRaw = $items('Car Revalidate', 0, 0)[0].json.response?.[0]?.text || '{}';\nconst carCtx = $items('Prepare Car Selection', 0, 0)[0].json;\n\nlet payment = {};\nlet revalidated = {};\n\ntry {\n  payment = JSON.parse(paymentRaw);\n} catch {}\n\ntry {\n  revalidated = JSON.parse(revalidateRaw);\n} catch {}\n\nreturn [{\n  json: {\n    success: true,\n    pickup: carCtx.pickupCode,\n    dropoff: carCtx.dropoffCode,\n    pickupDate: carCtx.pickupDate,\n    dropoffDate: carCtx.dropoffDate,\n    car: carCtx.selectedCar,\n    revalidated,\n    payment\n  }\n}];"
+      },
+      "id": "91dff94f-b80b-4fbb-9793-b47c8a6c1009",
+      "name": "Build Car Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## RouteStack Car Booking Flow\n\nThis workflow calls RouteStack car tools in sequence:\n\n1. `car_locations`\n2. `car_search`\n3. `car_revalidate`\n4. `car_get_payment_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports car APIs\n- Update tool arguments if your API expects additional parameters",
+        "height": 320,
+        "width": 760,
+        "color": 4
+      },
+      "id": "96b65f9d-7f03-4ef2-a9d8-cfbc23781010",
+      "name": "Car Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Car Booking Form": {
+      "main": [
+        [
+          {
+            "node": "Normalize Car Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Car Input": {
+      "main": [
+        [
+          {
+            "node": "Search Pickup Location",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Pickup Location": {
+      "main": [
+        [
+          {
+            "node": "Search Dropoff Location",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Dropoff Location": {
+      "main": [
+        [
+          {
+            "node": "Prepare Car Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Car Search": {
+      "main": [
+        [
+          {
+            "node": "Car Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Car Search": {
+      "main": [
+        [
+          {
+            "node": "Prepare Car Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Car Selection": {
+      "main": [
+        [
+          {
+            "node": "Car Revalidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Car Revalidate": {
+      "main": [
+        [
+          {
+            "node": "Get Car Payment URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Car Payment URL": {
+      "main": [
+        [
+          {
+            "node": "Build Car Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e7bb7b24-6c88-4f69-a4fc-91d1f39ef011",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "carBookingFlow01",
+  "tags": []
+}
