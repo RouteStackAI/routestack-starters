@@ -9,6 +9,10 @@ export interface BookingCancelledPayload {
   timestamp: string;
 }
 
+function toText(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 /**
  * Transform a booking.cancelled event into a forward-ready payload.
  * Return null to skip forwarding this event.
@@ -20,9 +24,9 @@ export function handleBookingCancelled(
 
   return {
     event: "booking.cancelled",
-    bookingId: (data.bookingId as string) ?? "unknown",
+    bookingId: toText(data.bookingId, "unknown"),
     status: "cancelled",
-    reason: (data.reason as string) ?? "not specified",
+    reason: toText(data.reason, "not specified"),
     data,
     timestamp: event.timestamp,
   };

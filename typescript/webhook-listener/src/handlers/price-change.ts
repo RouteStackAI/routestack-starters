@@ -7,9 +7,22 @@ export interface PriceChangePayload {
   previousPrice: number | null;
   currentPrice: number | null;
   currency: string;
-  direction: "up" | "down" | "unknown";
+  direction: "up" | "down" | "unchanged" | "unknown";
   data: Record<string, unknown>;
   timestamp: string;
+}
+
+function toText(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 /**
@@ -21,21 +34,27 @@ export function handlePriceChange(
 ): PriceChangePayload | null {
   const { data } = event;
 
-  const previousPrice = data.previousPrice as number | null ?? null;
-  const currentPrice = data.currentPrice as number | null ?? null;
+  const previousPrice = toNumber(data.previousPrice);
+  const currentPrice = toNumber(data.currentPrice);
 
-  let direction: "up" | "down" | "unknown" = "unknown";
+  let direction: "up" | "down" | "unchanged" | "unknown" = "unknown";
   if (previousPrice != null && currentPrice != null) {
-    direction = currentPrice > previousPrice ? "up" : "down";
+    if (currentPrice > previousPrice) {
+      direction = "up";
+    } else if (currentPrice < previousPrice) {
+      direction = "down";
+    } else {
+      direction = "unchanged";
+    }
   }
 
   return {
     event: "price.changed",
-    itemId: (data.itemId as string) ?? (data.id as string) ?? "unknown",
-    itemType: (data.itemType as string) ?? (data.type as string) ?? "unknown",
+    itemId: toText(data.itemId ?? data.id, "unknown"),
+    itemType: toText(data.itemType ?? data.type, "unknown"),
     previousPrice,
     currentPrice,
-    currency: (data.currency as string) ?? "USD",
+    currency: toText(data.currency, "USD"),
     direction,
     data,
     timestamp: event.timestamp,

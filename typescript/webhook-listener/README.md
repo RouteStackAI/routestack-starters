@@ -24,6 +24,7 @@ pnpm start
 | Variable | Required | Description |
 | :--- | :--- | :--- |
 | `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
+| `ROUTESTACK_API_SECRET` | Yes | Your RouteStack API secret |
 | `ROUTESTACK_MCP_URL` | No | MCP server endpoint (default: `https://mcp.routestack.ai/sse`) |
 | `FORWARD_URL` | Yes | URL to forward events to (e.g., Slack webhook, API endpoint) |
 | `EVENT_FILTER` | No | Comma-separated event types to listen for (default: all) |
@@ -123,6 +124,42 @@ EVENT_FILTER=booking.confirmed,booking.cancelled
 # Only price alerts
 EVENT_FILTER=price.changed
 ```
+
+## Testing Without Live Notifications
+
+If your MCP server is connected but not pushing notifications yet, you can still test end-to-end:
+
+### 1) Synthetic Dev Events
+
+```bash
+DEV_FAKE_EVENTS=true
+DEV_FAKE_EVENTS_INTERVAL_MS=5000
+```
+
+This emits sample `booking.confirmed`, `booking.cancelled`, and `price.changed` events and forwards them to your `FORWARD_URL`.
+
+### 2) Polling Fallback Mode
+
+```bash
+MCP_POLLING_FALLBACK=true
+MCP_POLL_INTERVAL_MS=15000
+MCP_POLL_TOOL_NAME=list_events
+MCP_POLL_TOOL_ARGS={"limit":20}
+MCP_POLL_RESULT_EVENTS_PATH=events
+```
+
+How polling mode works:
+
+1. Connects to MCP and waits for real notifications
+2. If none arrive within one poll interval, polling starts
+3. Calls `MCP_POLL_TOOL_NAME` with `MCP_POLL_TOOL_ARGS`
+4. Converts returned JSON into event objects
+5. Forwards each event through normal handlers + retry pipeline
+
+Notes:
+
+- `MCP_POLL_TOOL_NAME` is optional. If omitted, the listener tries to auto-select a likely tool from `listTools()`.
+- `MCP_POLL_RESULT_EVENTS_PATH` is optional. Use dot-path syntax (example: `data.events`) when your tool response wraps events under a nested field.
 
 ## Customization
 
