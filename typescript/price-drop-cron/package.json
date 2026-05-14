@@ -1,16 +1,22 @@
 {
   "name": "@routestack/price-drop-cron",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker cron for price alerts",
+  "description": "Cloudflare Worker cron for RouteStack flight price-drop alerts",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "build": "tsc"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "kv:create": "wrangler kv namespace create PRICE_CACHE",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
   "devDependencies": {
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "@cloudflare/workers-types": "^4.20260404.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.15.2"
   }
 }

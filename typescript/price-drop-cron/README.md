@@ -1,50 +1,76 @@
-# RouteStack.ai — Price Drop Cron
+# RouteStack.ai - Price Drop Cron
 
-A headless Cloudflare Worker that checks a flight route's price on a daily schedule and sends notifications when the price drops.
+A production-ready Cloudflare Worker cron app that checks configured flight routes through RouteStack MCP, stores last seen prices in KV, and sends notifications when prices drop past your threshold.
+
+## Features
+
+- Daily cron execution (configurable in `wrangler.toml`)
+- RouteStack MCP client with auth + Streamable HTTP/SSE fallback
+- KV-backed state per route (`lastPrice`, currency, timestamps)
+- Robust price extraction from varied MCP payload shapes
+- Resend email notifications on qualifying price drops
+- Health endpoint (`GET /health`) and manual trigger (`POST /run`)
 
 ## Prerequisites
 
-- A RouteStack API key ([get one at routestack.ai](https://routestack.ai))
-- A Cloudflare account with Workers enabled
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) installed
-- A Resend API key (for email) or Twilio (for SMS)
+- RouteStack API key (`ROUTESTACK_API_KEY`)
+- Cloudflare Workers + KV namespace bound as `PRICE_CACHE`
+- Resend API key + destination email (for notifications)
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# Add your API keys to .env
-pnpm install
-pnpm dev          # Local development with wrangler
+npm install
+npm run dev
+```
+
+## Required Wrangler Setup
+
+1. Create a KV namespace:
+
+```bash
+npm run kv:create
+```
+
+2. Add namespace binding in `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "PRICE_CACHE"
+id = "<your-namespace-id>"
+```
+
+## Environment Variables
+
+- `ROUTESTACK_API_KEY` (required)
+- `ROUTESTACK_API_SECRET` (required; used for partner-token auth flow)
+- `ROUTESTACK_MCP_URL` (optional; defaults to `https://mcp.routestack.ai/sse`)
+- `ROUTE_CONFIG_JSON` (optional; JSON array of routes)
+- `MCP_PRICE_TOOL_NAME` (optional; defaults to `flight_search`)
+- `MCP_PRICE_FIELD_PATH` (optional; comma-separated extraction paths)
+- `RESEND_API_KEY` + `NOTIFICATION_EMAIL` (optional but required for email alerts)
+- `NOTIFICATION_FROM_EMAIL` (optional; defaults to `onboarding@resend.dev`, use verified domain for production)
+
+## Route Config Example
+
+```json
+[
+  {
+    "id": "jfk-lhr",
+    "origin": "JFK",
+    "destination": "LHR",
+    "departureDate": "2026-07-01",
+    "adults": 1,
+    "cabinClass": "economy",
+    "currency": "USD",
+    "thresholdPercent": 5
+  }
+]
 ```
 
 ## Deploy
 
 ```bash
-wrangler d1 create routestack-price-cache    # Create KV namespace (first time only)
-# Update wrangler.toml with the KV namespace ID
-wrangler deploy
+npm run deploy
 ```
-
-## Configuration
-
-| Variable | Required | Description |
-|:---------|:---------|:------------|
-| `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
-| `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `RESEND_API_KEY` | Yes* | Resend key (*or use Twilio) |
-| `NOTIFICATION_EMAIL` | Yes* | Email to notify (*or use SMS) |
-
-## How It Works
-
-1. Cron trigger fires daily at 9am UTC
-2. Worker checks the configured route's current price via RouteStack MCP
-3. Compares to the last stored price in KV
-4. If price dropped by more than the threshold, sends a notification
-5. Stores the new price for the next check
-
-## Customization
-
-- Change the schedule in `wrangler.toml` (`crons` field)
-- Configure routes and thresholds in `src/config.ts`
-- Add SMS notifications via Twilio in `src/notifier.ts`
