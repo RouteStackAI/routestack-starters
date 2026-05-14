@@ -13,3 +13,8 @@ typescript/price-drop-cron/.vercel/
 typescript/price-drop-cron/dist/
 typescript/price-drop-cron/.tmp/
 typescript/price-drop-cron/npm-debug.log*
+
+# corp-approval-flow generated/local files
+typescript/corp-approval-flow/dist/
+typescript/corp-approval-flow/public/assets/
+typescript/corp-approval-flow/_tmp_*

@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(251, 146, 60, 0.18), transparent 55%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(249, 115, 22, 0.16), transparent 50%),
+    linear-gradient(180deg, #0b0b12 0%, #12121a 45%, #161621 100%);
+  color: #f7f7fb;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(18, 18, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 16px 55px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.field {
+  @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none transition;
+}
+
+.field:focus {
+  border-color: rgba(251, 146, 60, 0.85);
+  box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.16);
+}
+
+/* Native selects: dark dropdown list (OS support varies; improves Chrome/Edge/Firefox). */
+select.field {
+  color-scheme: dark;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #f7f7fb;
+}
+
+select.field option,
+select.field optgroup {
+  background-color: #161621;
+  color: #f1f5f9;
+}
+
+/* react-day-picker — match glass + orange accent (see DateRangePicker wrapper). */
+.corp-rdp-theme {
+  --rdp-accent-color: #fb923c;
+  --rdp-accent-background-color: rgba(251, 146, 60, 0.18);
+  --rdp-range_middle-background-color: rgba(251, 146, 60, 0.12);
+  --rdp-range_middle-color: #f1f5f9;
+  --rdp-range_start-color: #0c0c12;
+  --rdp-range_end-color: #0c0c12;
+  --rdp-range_start-date-background-color: #fb923c;
+  --rdp-range_end-date-background-color: #fb923c;
+  --rdp-today-color: #fdba74;
+  --rdp-outside-opacity: 0.35;
+  --rdp-weekday-opacity: 1;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.corp-rdp-theme .rdp-month_caption {
+  color: #fdba74;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.corp-rdp-theme .rdp-weekday {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.corp-rdp-theme .rdp-day_button:not([disabled]):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.corp-rdp-theme .rdp-button_previous:not([disabled]):hover,
+.corp-rdp-theme .rdp-button_next:not([disabled]):hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 0.5rem;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-orange-300/30 bg-orange-400/10 px-4 py-2 text-sm font-semibold text-orange-200 transition hover:bg-orange-400/20 disabled:opacity-50;
+}
+
+.card {
+  @apply overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition;
+}
+
+.card-selected {
+  border-color: rgba(251, 146, 60, 0.65);
+  box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.35), 0 10px 30px rgba(249, 115, 22, 0.18);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise-in {
+  animation: rise-in 0.28s ease-out both;
+}

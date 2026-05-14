@@ -1,55 +1,76 @@
-# RouteStack.ai — Corporate Approval Flow
+# RouteStack.ai - Corporate Approval Flow
 
-An AI agent that searches flights for employees and emails a JWT-signed Deep Link to their manager for one-click approval and booking.
+Corporate travel approval workflow with:
+- employee booking UI (flight/hotel),
+- MCP-powered search and checkout preparation,
+- manager approval via signed deep links (JWT),
+- approval email delivery via Resend.
 
-## Prerequisites
+## Tech stack
 
-- Node.js >= 20
-- A RouteStack API key ([get one at routestack.ai](https://routestack.ai))
-- An LLM API key (OpenAI or Anthropic)
-- A Resend API key (for approval emails)
+- Backend: `Hono` + `@hono/node-server` + TypeScript
+- Frontend: `React` + `Vite` + `Tailwind CSS`
+- LLM providers: `OpenAI`, `Anthropic`, `Mistral`
+- Tool orchestration: RouteStack MCP (`/sse`)
 
-## Quick Start
+## Setup
 
 ```bash
 cp .env.example .env
-# Add your API keys to .env
 pnpm install
-pnpm start
+pnpm dev
 ```
 
-## Configuration
+`pnpm dev` starts the Hono server on `PORT` (default `3000`) and serves the built web app from `public/`.
 
-| Variable | Required | Description |
-|:---------|:---------|:------------|
-| `ROUTESTACK_API_KEY` | Yes | Your RouteStack API key |
-| `ROUTESTACK_MCP_URL` | Yes | MCP server endpoint |
-| `OPENAI_API_KEY` | Yes | LLM API key |
-| `RESEND_API_KEY` | Yes | Resend key for sending emails |
-| `JWT_SECRET` | Yes | Secret for signing Deep Links |
+## Build and run scripts
 
-## How It Works
+- `pnpm dev`: run backend in dev mode (`tsx src/index.ts`)
+- `pnpm dev:web`: run Vite dev server for frontend-only development
+- `pnpm build`: build backend (`tsc`) and frontend (`vite build`)
+- `pnpm build:server`: build backend only
+- `pnpm build:web`: build frontend only
+- `pnpm start`: run backend (`tsx src/index.ts`)
 
-```
-Employee: "I need a flight from Denver to NYC, March 20-22"
-    ↓
-AI Agent → RouteStack MCP (search_flights)
-    ↓
-Select best option → Generate JWT-signed Deep Link
-    ↓
-Email to manager: "Approve this trip?"
-    ↓
-Manager clicks "Approve & Book" → Checkout page (pre-filled)
-```
+## Environment variables
 
-1. Employee submits a travel request
-2. AI agent searches RouteStack MCP for options
-3. A Deep Link is generated with a JWT-signed checkout URL
-4. Manager receives an email with trip details and an "Approve & Book" button
-5. Clicking the link opens the checkout with a pre-filled cart
+Required:
+- `ROUTESTACK_API_KEY`
+- `ROUTESTACK_API_SECRET`
+- `LLM_API_KEY`
+- `LLM_MODEL`
+- `RESEND_API_KEY`
+- `JWT_SECRET`
 
-## Customization
+Optional with defaults:
+- `ROUTESTACK_MCP_URL` (default `https://mcp.routestack.ai/sse`)
+- `LLM_PROVIDER` (`openai` | `anthropic` | `mistral`, default `openai`)
+- `MISTRAL_BASE_URL` (default `https://api.mistral.ai/v1`)
+- `RESEND_FROM_EMAIL` (default `approval@updates.routestack.ai`)
+- `APP_BASE_URL` (default `http://localhost:3000`)
+- `PORT` (default `3000`)
 
-- Customize the email template in `src/templates/approval-email.html`
-- Modify search criteria in `src/search.ts`
-- Add expense policy rules in `src/types.ts`
+Reference: `.env.example`.
+
+## API endpoints
+
+- `GET /health`: service health + loaded tool count + active LLM provider/model
+- `GET /api/lookups/flight?term=...`: flight location autocomplete
+- `GET /api/lookups/hotel-destination?query=...`: hotel destination autocomplete
+- `POST /api/search`: search travel options from employee request
+- `POST /api/flight/prepare-checkout`: revalidate selected flight and return checkout/payment URL
+- `POST /api/hotel/rooms`: load room options for selected hotel
+- `POST /api/hotel/prepare-checkout`: revalidate selected room and return checkout/payment URL
+- `POST /api/requests`: create approval request and email manager link
+- `GET /api/approvals/:token`: fetch approval details by signed token
+- `POST /api/approvals/:token/approve`: approve request and return payment URL (if available)
+
+## UI routes
+
+- `/`: employee booking and approval submission interface
+- `/approve?token=...`: manager approval screen
+
+## Notes
+
+- Approval records are currently kept in-memory (`Map`) and reset on server restart.
+- Manager links are JWT-signed using `JWT_SECRET`.
