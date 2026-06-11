@@ -393,6 +393,8 @@ export function TravelSearch({
           lat: destination.lat ?? 0,
           long: destination.long ?? 0,
           currency: "USD",
+          page: 1,
+          limit: 20,
         };
 
         const json = await callToolJson("search_hotels", args);
