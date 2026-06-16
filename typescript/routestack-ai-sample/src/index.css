@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+/* Tailwind v4: scan Streamdown utility classes (controls, caret, code blocks) */
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+
+/* shadcn-style tokens — required for Streamdown UI (see streamdown README) */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.2 0.01 286);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 286);
+  --muted: oklch(0.965 0.004 286);
+  --muted-foreground: oklch(0.5 0.01 286);
+  --border: oklch(0.92 0.004 286);
+  --input: oklch(0.92 0.004 286);
+  --primary: oklch(0.25 0.02 286);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.965 0.004 286);
+  --accent-foreground: oklch(0.2 0.01 286);
+  --ring: oklch(0.75 0.01 286);
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Assistant markdown — playground-style, flush with thread */
+.streamdown-chat {
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.streamdown-chat :where(p) {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.streamdown-chat :where(p:first-child) {
+  margin-top: 0;
+}
+
+.streamdown-chat :where(p:last-child) {
+  margin-bottom: 0;
+}
+
+.streamdown-chat :where(h1, h2, h3) {
+  scroll-margin-top: 1rem;
+}
+
+.streamdown-chat :where(table) {
+  display: block;
+  overflow-x: auto;
+}
