@@ -41,6 +41,7 @@ export interface ResultItem {
   imageUrl?: string;
   ctaLabel?: string;
   ctaUrl?: string;
+  fareCode?: string;
   accent?: "hotel" | "flight" | "car" | "booking" | "info";
 }
 

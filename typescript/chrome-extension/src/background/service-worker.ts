@@ -148,6 +148,7 @@ function getOrCreateConversation(tabId: number) {
     context: {
       hotel: {},
       flight: {},
+      car: {},
       generic: {
         recentSummaries: [],
       },
@@ -163,11 +164,16 @@ function buildUserPrompt(
   searchMode: "hotels" | "flights" | "cars",
   pageContext: PageContext | null,
 ) {
+  const normalizedPrompt = prompt.trim();
   const contextSummary = pageContext
-    ? `Page title: ${pageContext.title}\nTravel hints: ${pageContext.travelHints.join("; ") || "none"}`
+    ? `Page title: ${pageContext.title}\nTravel hints: ${pageContext.travelHints.join("; ") || "none"}\nPage excerpt: ${pageContext.textExcerpt || "none"}`
     : "No page context available.";
 
-  return [`Search mode: ${searchMode}`, `User request: ${prompt}`, contextSummary].join("\n");
+  const requestLine = normalizedPrompt
+    ? `User request: ${normalizedPrompt}`
+    : "User request: Build the search request from the page context and run a live inventory search.";
+
+  return [`Search mode: ${searchMode}`, requestLine, contextSummary].join("\n");
 }
 
 async function getPageContext(tabId: number): Promise<PageContext | null> {

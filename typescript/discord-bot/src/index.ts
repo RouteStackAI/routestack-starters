@@ -96,6 +96,8 @@ async function handleHotels(interaction: any) {
   const children = interaction.options.getInteger("children") ?? 0;
   const rooms = interaction.options.getInteger("rooms") ?? 1;
   const currency = "USD";
+  const page = 1;
+  const limit = 10;
 
   if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) {
     await interaction.editReply({
@@ -111,6 +113,8 @@ async function handleHotels(interaction: any) {
     checkOut,
     rooms: hotelRoomOccupancyFromCounts(rooms, adults, children),
     currency,
+    page,
+    limit,
   });
 
   const session = createSession({

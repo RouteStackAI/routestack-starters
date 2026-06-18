@@ -17,6 +17,11 @@ STRICT RULES:
 - ALWAYS reuse values from previous tool responses
 - If required data is missing, call the appropriate previous tool
 - Follow correct sequence
+- If user refines previous results, continue from current context instead of restarting
+- If user do not provide year when providing dates take year: ${new Date().getFullYear()} by default. The current date is ${new Date().toISOString()}
+- If user provides past dates, use the current date + 15 days as the start date.
+- For car_search tool, if you get multiple locations from car_locations tool, prefer first option or the airport location if available.
+- For car_search tool, if dates are not provided or provided as past dates, use the current date + 15 days as the start date and 1 day as the end date and execute the tool with the default values.
 
 HOTEL FLOW:
 1. search_destinations → search_hotels
@@ -29,6 +34,9 @@ FLIGHT FLOW:
 2. flight_locations → flight_search
 3. flight_search → flight_revalidate
 4. flight_revalidate → flight_get_payment_url
+
+CAR FLOW:
+car_locations → car_search → car_revalidate → car_get_payment_url
 
 Be concise and accurate.`;
 
@@ -59,6 +67,19 @@ export interface ToolExecutionContext {
       fareSourceCode?: string;
       flights?: any[];
       ourprice?: number;
+    };
+  };
+
+  car: {
+    correlationId?: string;
+    cars?: any[];
+    selectedCar?: {
+      fareCode?: string;
+      car?: any;
+    };
+    searchArgs?: {
+      pickup?: string;
+      dropoff?: string;
     };
   };
   generic: {
@@ -184,7 +205,6 @@ async function runOpenAiCompatible(
       const parsedArgs = safeParseJson(toolCall.function.arguments);
       const finalArgs = buildToolArgs(tool.name, parsedArgs, tool, context);
 
-      console.log("buildToolArgs:::", tool.name, parsedArgs, finalArgs)
       validateArgs(tool, finalArgs);
 
       const toolResult = await callTool(tool.name, finalArgs);
@@ -331,6 +351,7 @@ async function runAnthropic(
 }
 
 function buildContextPrompt(pageContext: PageContext | null, context: ToolExecutionContext) {
+  const car = context.car ?? {};
   const hotelSummary = (context.hotel.hotels ?? [])
     .slice(0, 5)
     .map((hotel, index) => `${index + 1}. ${hotel.name} (${hotel.id})`)
@@ -350,6 +371,17 @@ function buildContextPrompt(pageContext: PageContext | null, context: ToolExecut
       return `${index + 1}. ${firstSegment?.departure ?? "Origin"} to ${lastSegment?.arrival ?? "Destination"} (fareSourceCode=${flight?.fareSourceCode ?? "unknown"})`;
     })
     .join("\n");
+
+  const carSummaries = Array.isArray(car.cars)
+      ? car.cars
+          .slice(0, 5)
+          .map((item: any, index: number) => {
+            const fareCode = item?.fareCode ?? item?.price_postpaid?.fareCode ?? "unknown";
+            const carName = item?.title ?? item?.name ?? "unknown";
+            return `${index + 1}. ${carName} (fareCode: ${fareCode})`;
+          })
+          .join("\n")
+      : "";
 
   return [
     "Current page context:",
@@ -377,6 +409,12 @@ function buildContextPrompt(pageContext: PageContext | null, context: ToolExecut
       ? `- Selected flight: ${context.flight.selectedFlight.fareSourceCode}`
       : "- No flight selected",
     flightSummary ? `- Cached flights:\n${flightSummary}` : "- No cached flights",
+    carSummaries
+    ? `- Cars from previous search:\n${carSummaries}`
+    : "- No cached car list",
+  car.selectedCar
+    ? `- Selected car: ${car.selectedCar.fareCode}`
+    : "- No car selected yet",
   ].join("\n");
 }
 
@@ -427,6 +465,22 @@ function buildToolArgs(
     !hasValue(enriched.fareSourceCode)
   ) {
     enriched.fareSourceCode = context.flight.selectedFlight.fareSourceCode;
+  }
+
+  if (
+    "correlationId" in properties &&
+    context.car?.correlationId &&
+    !hasValue(enriched.correlationId)
+  ) {
+    enriched.correlationId = context.car.correlationId;
+  }
+
+  if (
+    name === "car_revalidate" &&
+    context.car?.selectedCar?.fareCode &&
+    !hasValue(enriched.fareCode)
+  ) {
+    enriched.fareCode = context.car.selectedCar.fareCode;
   }
 
   if (name === "flight_search") {
@@ -560,6 +614,19 @@ function reduceToolResult(toolName: string, json: any): any {
     };
   }
 
+  if (toolName === "car_search" && json) {
+    const rawCars = json?.result?.cars ?? [];
+    return {
+      correlationId: json?.correlationId,
+      currency: json?.result?.currency,
+      count: json?.result?.count,
+      cars: rawCars
+        .slice(0, 8)
+        .map((car: Record<string, unknown>) => normalizeRouteStackCar(car))
+        .filter((car: NormalizedCarOption | null): car is NormalizedCarOption => Boolean(car)),
+    };
+  }
+
   return json;
 }
 
@@ -569,6 +636,7 @@ function updateExecutionContext(
   result: any,
   context: ToolExecutionContext,
 ) {
+  context.car ??= {};
   context.generic.lastToolName = toolName;
   context.generic.lastToolJson = result;
   context.generic.recentSummaries.push(`${toolName} completed`);
@@ -638,6 +706,37 @@ function updateExecutionContext(
       fareSourceCode: String(args.fareSourceCode),
     };
   }
+
+  if (toolName === "car_search") {
+    context.car.correlationId = result?.correlationId;
+    context.car.cars = result?.cars ?? [];
+
+    const filter = args.filter;
+    if (filter && typeof filter === "object" && !Array.isArray(filter)) {
+      const pickup = (filter as Record<string, unknown>).pickup;
+      const dropoff = (filter as Record<string, unknown>).dropoff;
+      context.car.searchArgs = {
+        pickup: typeof pickup === "object" ? JSON.stringify(pickup) : String(pickup ?? ""),
+        dropoff: typeof dropoff === "object" ? JSON.stringify(dropoff) : String(dropoff ?? ""),
+      };
+    }
+  }
+
+  if (toolName === "car_revalidate") {
+    const root = result?.result ?? result ?? {};
+    const fareCode = hasValue(args.fareCode) ? String(args.fareCode) : root?.fareCode;
+    context.car.selectedCar = {
+      fareCode,
+      car: root?.car ?? root,
+    };
+
+    if (root?.pickup || root?.dropoff) {
+      context.car.searchArgs = {
+        pickup: root?.pickup,
+        dropoff: root?.dropoff,
+      };
+    }
+  }
 }
 
 function summarizeToolResult(toolName: string, result: any, toolResult: McpToolResult) {
@@ -647,6 +746,7 @@ function summarizeToolResult(toolName: string, result: any, toolResult: McpToolR
     return `${toolName} returned ${(result?.rooms ?? []).length} room options`;
   }
   if (toolName === "flight_search") return `${toolName} found ${(result?.flights ?? []).length} flights`;
+  if (toolName === "car_search") return `${toolName} found ${(result?.cars ?? []).length} cars`;
   return `${toolName} completed`;
 }
 
@@ -718,6 +818,27 @@ function resultSectionFromTool(toolName: string, json: any): ResultSection | nul
     };
   }
 
+  if (toolName === "car_search" && Array.isArray(json.cars)) {
+    const items = json.cars.slice(0, 6).map((car: NormalizedCarOption) => ({
+      title: car.title,
+      subtitle: car.partner,
+      price: car.price,
+      meta: car.meta,
+      description: car.description,
+      imageUrl: car.imageUrl,
+      fareCode: car.fareCode,
+      accent: "car" as const,
+    }));
+
+    if (items.length) {
+      return {
+        title: "Rental cars",
+        kind: "car",
+        items,
+      };
+    }
+  }
+
   if (toolName.includes("payment_url") || toolName.includes("booking_url")) {
     const bookingUrl = findUrl(json);
     if (!bookingUrl) return null;
@@ -783,7 +904,18 @@ function collectObjects(value: unknown): Record<string, unknown>[] {
 }
 
 function hasCarShape(value: Record<string, unknown>) {
-  return "vehicleName" in value || "category" in value || "transmission" in value || "seats" in value;
+  return (
+    "vehicleName" in value ||
+    "vehicle" in value ||
+    "carName" in value ||
+    "category" in value ||
+    "carCategory" in value ||
+    "transmission" in value ||
+    "seats" in value ||
+    "passengers" in value ||
+    "baggage" in value ||
+    "supplierName" in value
+  );
 }
 
 function findUrl(value: unknown): string | undefined {
@@ -905,10 +1037,157 @@ function formatCurrency(value: unknown): string | undefined {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(numeric);
 }
 
 function hasValue(value: unknown): boolean {
   return value !== undefined && value !== null && value !== "";
+}
+
+interface NormalizedCarOption {
+  title: string;
+  price?: string;
+  partner?: string;
+  meta: string[];
+  description?: string;
+  imageUrl?: string;
+  fareCode?: string;
+}
+
+function normalizeRouteStackCar(car: Record<string, unknown>): NormalizedCarOption | null {
+  const category = firstString(car.type_name, car.description) ?? "Car";
+  const vehicleName = firstString(car.name) ?? "or similar";
+  const title = `${category} – ${vehicleName}`;
+
+  const pricePostpaid = car.price_postpaid as Record<string, unknown> | null | undefined;
+  const pricePrepaid = car.price_prepaid as Record<string, unknown> | null | undefined;
+  const activePrice = pricePrepaid ?? pricePostpaid;
+  const total = firstDefined(car.display_price, car.show_display_price, activePrice?.showTotal, activePrice?.total);
+  const rateType = firstString(activePrice?.rateType);
+  const rateLabel =
+    rateType === "prepaid" ? "Prepaid" : rateType === "postpaid" ? "Pay Later" : undefined;
+  const priceText = formatCurrency(total);
+  const price = priceText ? `${priceText}${rateLabel ? ` (${rateLabel})` : ""}` : undefined;
+
+  const partnerRecord = car.partner as Record<string, unknown> | undefined;
+  const partner = firstString(partnerRecord?.name, partnerRecord?.code);
+
+  const transmission = car.manual_transmission === true
+    ? "Manual"
+    : car.hasAMT === true
+      ? "Automatic"
+      : firstString(car.transmission);
+
+  const passengers = asCount(car.passengers);
+  const doors = asCount(car.doors);
+  const bags = asCount(car.bags);
+
+  const fuelType = formatFuelType(firstString(car.fuelType));
+
+  const pickup = car.pickup as Record<string, unknown> | undefined;
+  const dropoff = car.dropoff as Record<string, unknown> | undefined;
+  const pickupLabel = formatCarLocation(pickup);
+  const dropoffLabel = formatCarLocation(dropoff);
+  const pickupDropoff =
+    pickupLabel && dropoffLabel && pickupLabel !== dropoffLabel
+      ? `${pickupLabel} -> ${dropoffLabel}`
+      : pickupLabel ?? dropoffLabel;
+
+  const freeCancellation = asBoolean(
+    firstDefined(pricePostpaid?.free_cancellation, pricePrepaid?.free_cancellation),
+  );
+  const mileage =
+    car.mileage === true ? "Unlimited" : car.mileage === false ? "Limited" : undefined;
+  const inclusions = Array.isArray(car.inclusions)
+    ? car.inclusions.map((entry) => String(entry)).join(", ")
+    : undefined;
+
+  const fareCode = firstString(pricePostpaid?.fareCode, pricePrepaid?.fareCode);
+
+  const meta = [
+    transmission ? `Transmission: ${transmission}` : "",
+    passengers || doors || bags
+      ? `Passengers: ${passengers ?? "—"} | Doors: ${doors ?? "—"} | Bags: ${bags ?? "—"}`
+      : "",
+  ].filter(Boolean);
+
+  const detailLines = [
+    fuelType ? `Fuel Type: ${fuelType}` : "",
+    pickupDropoff ? `Pickup/Dropoff: ${pickupDropoff}` : "",
+    partner ? `Partner: ${partner}` : "",
+    freeCancellation !== undefined
+      ? `Free Cancellation: ${freeCancellation ? "Yes" : "No"}`
+      : "",
+    mileage ? `Mileage: ${mileage}` : "",
+    inclusions ? `Inclusions: ${inclusions}` : "",
+  ]
+    .filter(Boolean)
+    .map((line) => `- ${line}`)
+    .join("\n");
+
+  return {
+    title,
+    price,
+    partner,
+    meta,
+    description: detailLines,
+    imageUrl: firstString(car.heroImage),
+    fareCode,
+  };
+}
+
+function formatFuelType(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const labels: Record<string, string> = {
+    petrol_gasoline: "Petrol/Gasoline",
+    diesel: "Diesel",
+    electric: "Electric",
+    hybrid: "Hybrid",
+  };
+  return labels[value] ?? value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatCarLocation(location: Record<string, unknown> | undefined): string | undefined {
+  if (!location) return undefined;
+
+  const place = firstString(location.airport_name, location.location);
+  const info = firstString(location.location_information);
+  const code = firstString(location.airport_code, location.location_code);
+
+  if (!place) return undefined;
+  if (info) return `${place}${code ? ` (${code})` : ""} (${info})`;
+  return code ? `${place} (${code})` : place;
+}
+
+function firstDefined(...values: unknown[]): unknown {
+  for (const value of values) {
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function asCount(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return undefined;
+}
+
+function asBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "y", "1"].includes(normalized)) return true;
+    if (["false", "no", "n", "0"].includes(normalized)) return false;
+  }
+  return undefined;
 }

@@ -84,12 +84,21 @@ export interface CarOffer {
   id: string;
   vendor: string;
   vehicleName: string;
+  category?: string;
   pickupLocation?: string;
   dropoffLocation?: string;
   transmission?: string;
   seats?: number;
+  doors?: number;
+  bags?: number;
+  fuelType?: string;
+  mileage?: string;
+  freeCancellation?: boolean;
+  inclusions?: string[];
+  image?: string;
   price?: number;
   currency?: string;
+  rateType?: string;
   fareCode?: string;
   correlationId?: string;
   raw: Record<string, unknown>;
@@ -119,6 +128,8 @@ export interface HotelSessionData {
   paymentUrl?: string;
   shortPaymentUrl?: string;
   aiNote?: string | null;
+  page: number;
+  limit: number;
 }
 
 export interface FlightSessionData {
@@ -152,6 +163,7 @@ export interface CarSessionData {
   driverAge: number;
   pickup?: LookupOption;
   dropoff?: LookupOption;
+  correlationId?: string;
   cars: CarOffer[];
   selectedCar?: CarOffer;
   paymentUrl?: string;

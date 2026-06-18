@@ -22,6 +22,7 @@ const state = {
   toolCalls: [] as Array<{ name: string; summary: string }>,
   settingsIssues: [] as string[],
   settings: null as ExtensionSettings | null,
+  pageContext: null as Extract<PanelResponse, { ok: true }>["payload"]["pageContext"],
 };
 
 void bootstrap();
@@ -274,7 +275,7 @@ function renderResultCard(item: ResultItem, section: ResultSection) {
             : ""
         }
 
-        ${item.description ? `<div class="description markdown-body">${renderHtmlDescription(item.description)}</div>` : ""}
+        ${item.description ? `<div class="description markdown-body">${renderRichText(item.description)}</div>` : ""}
         <div class="card-actions">
           ${
             item.ctaUrl
@@ -292,7 +293,11 @@ function buildFollowUp(item: ResultItem, section: ResultSection) {
   const subject = item.title || section.title;
   if (section.kind === "hotel") return `Show me more details for ${subject} and help me book it.`;
   if (section.kind === "flight") return `Compare this flight option: ${subject}, then help me book the best one.`;
-  if (section.kind === "car") return `Show me more details for this car option: ${subject}.`;
+  if (section.kind === "car") {
+    return item.fareCode
+      ? `Revalidate and book this car: ${subject} (fareCode: ${item.fareCode}).`
+      : `Show me more details for this car option: ${subject} and help me book it.`;
+  }
   if (section.kind === "booking") return `Continue with ${subject}.`;
   return `Tell me more about ${subject}.`;
 }
@@ -320,8 +325,12 @@ function wireEvents() {
   });
 
   document.querySelector("#search-btn")?.addEventListener("click", async () => {
-    const prompt = state.promptDraft.trim();
-    if (!prompt) return;
+    const prompt = state.promptDraft.trim() || buildPageDrivenPrompt(state.searchMode, state.pageContext);
+    if (!prompt) {
+      state.assistantMessage = "Add a request or open a travel-related page so I can search live inventory.";
+      render();
+      return;
+    }
 
     state.loading = true;
     state.assistantMessage = `Searching ${state.searchMode}...`;
@@ -410,6 +419,7 @@ async function sendRequest(request: PanelRequest): Promise<PanelResponse> {
 }
 
 function applyPayload(response: Extract<PanelResponse, { ok: true }>) {
+  state.pageContext = response.payload.pageContext;
   state.assistantMessage = response.payload.assistantMessage;
   state.resultSections = response.payload.resultSections;
   state.toolCalls = response.payload.toolCalls.map((toolCall) => ({
@@ -426,6 +436,12 @@ function applyPayload(response: Extract<PanelResponse, { ok: true }>) {
 
   const hints = response.payload.pageContext.travelHints.join(" | ") || "No travel hints found on the page.";
   state.pageSummary = `${response.payload.pageContext.title} | ${hints}`;
+
+  if (!state.promptDraft.trim()) {
+    const inferredMode = inferSearchModeFromPageContext(response.payload.pageContext);
+    state.searchMode = inferredMode;
+    state.promptDraft = buildPageDrivenPrompt(inferredMode, response.payload.pageContext);
+  }
 }
 
 function valueOf(selector: string): string {
@@ -539,6 +555,52 @@ function renderInline(value: string) {
   html = html.replace(/(^|[\s>])\*([^*]+)\*(?=$|[\s<])/g, "$1<em>$2</em>");
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   return html;
+}
+
+function inferSearchModeFromPageContext(
+  pageContext: Extract<PanelResponse, { ok: true }>["payload"]["pageContext"],
+): "hotels" | "flights" | "cars" {
+  if (!pageContext) return "hotels";
+
+  const source = [
+    pageContext.title,
+    pageContext.description,
+    pageContext.selection,
+    pageContext.headings.join(" "),
+    pageContext.travelHints.join(" "),
+    pageContext.textExcerpt,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (/\b(flight|flights|airline|airport|departure|arrival|nonstop|layover)\b/.test(source)) {
+    return "flights";
+  }
+  if (/\b(car|cars|rental|rent a car|vehicle|pickup|dropoff|drop-off)\b/.test(source)) {
+    return "cars";
+  }
+  return "hotels";
+}
+
+function buildPageDrivenPrompt(
+  mode: "hotels" | "flights" | "cars",
+  pageContext: Extract<PanelResponse, { ok: true }>["payload"]["pageContext"],
+): string {
+  if (!pageContext) return "";
+
+  const hints = pageContext.travelHints.join("; ");
+  const contextSnippets = [pageContext.selection, pageContext.description, pageContext.textExcerpt]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (mode === "flights") {
+    return `Use this page context to search flights. Focus on dates, route, and travelers from: ${hints || pageContext.title}. ${contextSnippets.join(" ")}`.trim();
+  }
+  if (mode === "cars") {
+    return `Use this page context to search rental cars. Focus on pickup/drop-off location and dates from: ${hints || pageContext.title}. ${contextSnippets.join(" ")}`.trim();
+  }
+  return `Use this page context to search hotels. Focus on destination, stay dates, and guests from: ${hints || pageContext.title}. ${contextSnippets.join(" ")}`.trim();
 }
 
 function icon(name: string) {

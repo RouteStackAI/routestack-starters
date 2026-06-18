@@ -18,15 +18,19 @@ import {
   extractPaymentUrl,
   extractText,
   findFlightSearchMeta,
+  firstRecord,
   formatRoomSummary,
   formatToolError,
+  normalizeCarLookupOptions,
   normalizeCarOffers,
   normalizeFlightOffers,
   normalizeHotelListings,
   normalizeHotelLookupOptions,
   normalizeHotelRoomOffers,
   normalizeLookupOptions,
+  preferAirportLookupOption,
   readStringRecord,
+  sanitizeCarPaymentPayload,
 } from "./utils.js";
 
 async function callToolJson(name: string, args: Record<string, unknown>) {
@@ -59,12 +63,35 @@ function buildFlightLocationPayload(option: LookupOption) {
 }
 
 function resolveBestLookupOption(term: string, options: LookupOption[]) {
-  const normalizedTerm = term.trim().toLowerCase();
-  return (
-    options.find((option) => option.code?.toLowerCase() === normalizedTerm) ??
-    options.find((option) => option.label.toLowerCase() === normalizedTerm) ??
-    options[0]
-  );
+  return preferAirportLookupOption(term, options);
+}
+
+function buildCarLocationPayload(option: LookupOption, date: string) {
+  return {
+    name:
+      readStringRecord(option.raw, ["name", "location_name", "locationName", "displayName"]) ??
+      option.label,
+    code:
+      readStringRecord(option.raw, ["code", "location_code", "locationCode", "iata", "airport_code"]) ??
+      option.code ??
+      option.label,
+    date,
+    time: "10:00",
+  };
+}
+
+function buildCarSearchFilter(
+  pickup: LookupOption,
+  dropoff: LookupOption,
+  pickupDate: string,
+  dropoffDate: string,
+) {
+  return {
+    pickup: buildCarLocationPayload(pickup, pickupDate),
+    dropoff: buildCarLocationPayload(dropoff, dropoffDate),
+    pickupLocation: pickup.raw,
+    dropoffLocation: dropoff.raw,
+  };
 }
 
 export async function getBookingInfo(bookingId: string) {
@@ -86,6 +113,8 @@ export async function createHotelDiscoverySession(input: {
   checkOut: string;
   rooms: HotelRoomOccupancy[];
   currency: string;
+  page: number;
+  limit: number;
 }): Promise<HotelSessionData> {
   const raw = (await callToolJson("search_destinations", {
     query: input.query,
@@ -107,6 +136,8 @@ export async function createHotelDiscoverySession(input: {
     hotels: [],
     roomOffers: [],
     aiNote: null,
+    page: input.page,
+    limit: input.limit,
   };
 }
 
@@ -122,6 +153,8 @@ export async function searchHotelsForDestination(
     lat: destination.lat ?? 0,
     long: destination.long ?? 0,
     currency: input.currency,
+    page: input.page,
+    limit: input.limit,
   });
 
   const normalized = normalizeHotelListings(json, destination.fullName);
@@ -393,27 +426,35 @@ export async function createCarSession(input: {
     callToolJson("car_locations", { term: input.dropoffQuery }),
   ]);
 
-  const pickupOptions = normalizeLookupOptions(pickupRaw, "pickup");
-  const dropoffOptions = normalizeLookupOptions(dropoffRaw, "dropoff");
-  const pickup = resolveBestLookupOption(input.pickupQuery, pickupOptions);
-  const dropoff = resolveBestLookupOption(input.dropoffQuery, dropoffOptions);
+  const pickupOptions = normalizeCarLookupOptions(pickupRaw);
+  const dropoffOptions = normalizeCarLookupOptions(dropoffRaw);
+  const pickup = preferAirportLookupOption(input.pickupQuery, pickupOptions);
+  const dropoff = preferAirportLookupOption(input.dropoffQuery, dropoffOptions);
 
   if (!pickup || !dropoff) {
-    throw new Error("RouteStack could not resolve one or both car locations.");
+    const missing = [
+      !pickupOptions.length ? `pickup "${input.pickupQuery}"` : null,
+      !dropoffOptions.length ? `dropoff "${input.dropoffQuery}"` : null,
+    ].filter(Boolean);
+
+    throw new Error(
+      missing.length
+        ? `No car locations found for ${missing.join(" and ")}. Try an airport code like JFK or a city name.`
+        : "RouteStack could not resolve one or both car locations.",
+    );
   }
 
-  const filter = {
-    pickup: pickup.code ?? pickup.label,
-    dropoff: dropoff.code ?? dropoff.label,
-    pickupDate: input.pickupDate,
-    dropoffDate: input.dropoffDate,
-    driverAge: input.driverAge,
-    pickupLocation: pickup.raw,
-    dropoffLocation: dropoff.raw,
-  };
+  const filter = buildCarSearchFilter(
+    pickup,
+    dropoff,
+    input.pickupDate,
+    input.dropoffDate,
+  );
 
   const carsRaw = await callToolJson("car_search", { filter });
   const cars = normalizeCarOffers(carsRaw);
+  const correlationId =
+    readStringRecord(firstRecord(carsRaw), ["correlationId", "correlationid"]) ?? undefined;
   const aiNote = await summarizeTravelOptions({
     category: "cars",
     userRequest: input.userRequest,
@@ -437,6 +478,7 @@ export async function createCarSession(input: {
     driverAge: input.driverAge,
     pickup,
     dropoff,
+    correlationId,
     cars,
     aiNote,
   };
@@ -453,7 +495,7 @@ export async function prepareCarCheckout(
 
   await callToolJson("car_revalidate", {
     fareCode: car.fareCode ?? car.id,
-    correlationId: car.correlationId,
+    correlationId: car.correlationId ?? session.correlationId,
   });
 
   const paymentJson = await callToolJson("car_get_payment_url", {
@@ -461,7 +503,7 @@ export async function prepareCarCheckout(
     dropoff: session.dropoff.code ?? session.dropoff.label,
     pickupDate: session.pickupDate,
     dropoffDate: session.dropoffDate,
-    car: car.raw,
+    car: sanitizeCarPaymentPayload(car.raw),
     portalUrl: config.routestack.portalUrl || undefined,
   });
 

@@ -16,7 +16,8 @@ export function formatPrice(price?: number, currency?: string) {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency || "USD",
-      maximumFractionDigits: 0,
+      minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
+      maximumFractionDigits: 2,
     }).format(price);
   } catch {
     return `${currency ?? "USD"} ${price}`;
@@ -230,7 +231,7 @@ export function normalizeLookupOptions(
 
   return records.slice(0, 8).map((item, index) => ({
     id:
-      readString(item, ["id", "destinationId", "code", "airportCode"]) ??
+      readString(item, ["id", "destinationId", "code", "airportCode", "location_code", "locationCode"]) ??
       `${fallbackLabel}-${index}`,
     label:
       readString(item, [
@@ -239,13 +240,53 @@ export function normalizeLookupOptions(
         "displayName",
         "city",
         "description",
+        "location_name",
+        "locationName",
+        "airport_name",
+        "airportName",
       ]) ?? fallbackLabel,
-    subtitle: readString(item, ["fullName", "country", "region", "address"]),
-    code: readString(item, ["code", "airportCode", "iata", "iataCode"]),
+    subtitle: readString(item, ["fullName", "country", "region", "address", "state", "type"]),
+    code: readString(item, ["code", "airportCode", "iata", "iataCode", "location_code", "locationCode"]),
     lat: readNumber(item, ["lat", "latitude"]),
     long: readNumber(item, ["long", "lng", "longitude"]),
     raw: item,
   }));
+}
+
+export function normalizeCarLookupOptions(raw: unknown): LookupOption[] {
+  const root = firstRecord(raw);
+  if (!root) return [];
+
+  const directLists = [root.result, root.data, root.locations];
+  for (const candidate of directLists) {
+    if (Array.isArray(candidate) && candidate.some(isRecord)) {
+      return normalizeLookupOptions({ result: candidate }, "location");
+    }
+  }
+
+  return normalizeLookupOptions(raw, "location");
+}
+
+export function preferAirportLookupOption(
+  term: string,
+  options: LookupOption[],
+): LookupOption | undefined {
+  if (!options.length) return undefined;
+
+  const normalizedTerm = term.trim().toLowerCase();
+  const airportOptions = options.filter((option) => {
+    const type = readString(option.raw, ["type"]);
+    return type?.toLowerCase() === "airport";
+  });
+
+  return (
+    airportOptions.find((option) => option.code?.toLowerCase() === normalizedTerm) ??
+    options.find((option) => option.code?.toLowerCase() === normalizedTerm) ??
+    airportOptions.find((option) => option.label.toLowerCase().includes(normalizedTerm)) ??
+    options.find((option) => option.label.toLowerCase() === normalizedTerm) ??
+    airportOptions[0] ??
+    options[0]
+  );
 }
 
 export function normalizeHotelListings(
@@ -402,35 +443,189 @@ export function normalizeFlightOffers(raw: unknown): FlightOffer[] {
 }
 
 export function normalizeCarOffers(raw: unknown): CarOffer[] {
+  const root = firstRecord(raw);
   const session = findSessionMeta(raw);
-  const records = findRecords(raw, [
-    "cars",
-    "vehicles",
-    "results",
-    "items",
-    "data",
-    "result",
-  ]);
+  const result = root && isRecord(root.result) ? root.result : root;
+  const cars =
+    result && Array.isArray(result.cars)
+      ? result.cars.filter(isRecord)
+      : findRecords(raw, ["cars", "vehicles", "results", "items", "data"]).filter(
+          (item) => "name" in item || "vehicleName" in item,
+        );
 
-  return records.slice(0, 5).map((item, index) => ({
-    id: readString(item, ["id", "fareCode", "vehicleId"]) ?? `car-${index}`,
-    vendor:
-      readString(item, ["vendor", "provider", "company"]) ?? "Rental partner",
-    vehicleName:
-      readString(item, ["vehicleName", "name", "carType", "description"]) ??
-      "Vehicle",
-    pickupLocation: readString(item, ["pickupLocation", "pickup", "location"]),
-    dropoffLocation: readString(item, ["dropoffLocation", "dropoff"]),
-    transmission: readString(item, ["transmission"]),
-    seats: readNumber(item, ["seats", "passengers"]),
-    price: readNumber(item, ["price", "amount", "total"]),
-    currency: readString(item, ["currency", "currencyCode"]),
-    fareCode: readString(item, ["fareCode", "fareSourceCode"]),
-    correlationId:
-      readString(item, ["correlationId", "correlationid"]) ??
-      session.correlationId,
-    raw: item,
-  }));
+  const currency = readStringRecord(result, ["currency"]) ?? "USD";
+
+  return cars.slice(0, 6).map((item, index) => {
+    const partner = isRecord(item.partner) ? item.partner : null;
+    const pricePostpaid = isRecord(item.price_postpaid) ? item.price_postpaid : null;
+    const pricePrepaid = isRecord(item.price_prepaid) ? item.price_prepaid : null;
+    const activePrice = pricePrepaid ?? pricePostpaid;
+    const pickup = isRecord(item.pickup) ? item.pickup : null;
+    const dropoff = isRecord(item.dropoff) ? item.dropoff : null;
+    const category = readString(item, ["type_name", "description"]) ?? "Car";
+    const vehicleName = readString(item, ["name"]) ?? "or similar";
+    const fareCode =
+      readStringRecord(pricePostpaid, ["fareCode"]) ??
+      readStringRecord(pricePrepaid, ["fareCode"]) ??
+      readString(item, ["fareCode", "fareSourceCode"]);
+
+    return {
+      id: `car-${index}`,
+      vendor: readStringRecord(partner, ["name"]) ?? "Rental partner",
+      vehicleName: `${category} – ${vehicleName}`,
+      category,
+      pickupLocation: formatCarLocationLabel(pickup),
+      dropoffLocation: formatCarLocationLabel(dropoff),
+      transmission:
+        item.manual_transmission === true
+          ? "Manual"
+          : item.hasAMT === true
+            ? "Automatic"
+            : readString(item, ["transmission"]),
+      seats: readNumber(item, ["passengers", "seats"]),
+      doors: readNumber(item, ["doors"]),
+      bags: readNumber(item, ["bags"]),
+      fuelType: formatFuelType(readString(item, ["fuelType"])),
+      mileage: item.mileage === true ? "Unlimited" : item.mileage === false ? "Limited" : undefined,
+      freeCancellation:
+        readBoolean(pricePostpaid ?? {}, ["free_cancellation"]) ??
+        readBoolean(pricePrepaid ?? {}, ["free_cancellation"]),
+      inclusions: Array.isArray(item.inclusions)
+        ? item.inclusions.map((entry) => String(entry)).filter(Boolean)
+        : [],
+      image: readString(item, ["heroImage", "image", "imageUrl"]),
+      price:
+        readNumber(item, ["display_price", "show_display_price"]) ??
+        readNumber(activePrice ?? {}, ["showTotal", "total"]),
+      currency: readStringRecord(activePrice, ["currency"]) ?? currency,
+      rateType: readStringRecord(activePrice, ["rateType"]),
+      fareCode,
+      correlationId:
+        readStringRecord(root, ["correlationId", "correlationid"]) ??
+        session.correlationId,
+      raw: item,
+    };
+  });
+}
+
+function formatFuelType(value?: string) {
+  if (!value) return undefined;
+  const labels: Record<string, string> = {
+    petrol_gasoline: "Petrol/Gasoline",
+    diesel: "Diesel",
+    electric: "Electric",
+    hybrid: "Hybrid",
+  };
+  return labels[value] ?? value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatCarLocationLabel(location: Record<string, unknown> | null) {
+  if (!location) return undefined;
+
+  const place =
+    readString(location, ["airport_name", "location", "name"]) ?? "Location";
+  const info = readString(location, ["location_information"]);
+  const code = readString(location, ["airport_code", "location_code", "code"]);
+
+  if (info) {
+    return `${place}${code ? ` (${code})` : ""} (${info})`;
+  }
+
+  return code ? `${place} (${code})` : place;
+}
+
+function stringOrEmpty(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function numberOrZero(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function sanitizeCarPriceBlock(
+  block: Record<string, unknown> | null,
+  fallback: Record<string, unknown>,
+) {
+  const source = block ?? {};
+  return {
+    currency: readString(source, ["currency"]) ?? readString(fallback, ["currency"]) ?? "USD",
+    symbol: stringOrEmpty(source.symbol),
+    total: numberOrZero(source.total ?? source.showTotal),
+    showTotal: numberOrZero(source.showTotal ?? source.total),
+    rateType: readString(source, ["rateType"]) ?? readString(fallback, ["rateType"]) ?? "postpaid",
+    net_rate: readBoolean(source, ["net_rate"]) ?? false,
+    pay_at_booking: readBoolean(source, ["pay_at_booking"]) ?? false,
+    mileage: readBoolean(source, ["mileage"]) ?? false,
+    free_cancellation: readBoolean(source, ["free_cancellation"]) ?? false,
+    days: numberOrZero(source.days),
+    fareCode: stringOrEmpty(source.fareCode),
+    allow_cancellation:
+      readString(source, ["allow_cancellation"]) ??
+      (readBoolean(source, ["free_cancellation"]) ? "true" : "false"),
+    strikeout_price: numberOrZero(source.strikeout_price),
+    margin: numberOrZero(source.margin),
+    netPrice: numberOrZero(source.netPrice),
+    marginPerc: numberOrZero(source.marginPerc),
+    merchantFee: numberOrZero(source.merchantFee),
+    merchantFeesPerc: numberOrZero(source.merchantFeesPerc),
+  };
+}
+
+function sanitizeCarLocationBlock(location: Record<string, unknown> | null) {
+  const source = location ?? {};
+  return {
+    ...source,
+    neighborhood: stringOrEmpty(source.neighborhood),
+    location_information: stringOrEmpty(source.location_information),
+    airport_name: stringOrEmpty(source.airport_name),
+    airport_code: stringOrEmpty(source.airport_code),
+    location_code: stringOrEmpty(source.location_code),
+    location: stringOrEmpty(source.location),
+  };
+}
+
+export function sanitizeCarPaymentPayload(car: Record<string, unknown>) {
+  const partner = isRecord(car.partner) ? car.partner : {};
+  const discounts = isRecord(car.discounts) ? car.discounts : {};
+  const pricePostpaid = isRecord(car.price_postpaid) ? car.price_postpaid : null;
+  const pricePrepaid = isRecord(car.price_prepaid) ? car.price_prepaid : null;
+  const sanitizedPostpaid = sanitizeCarPriceBlock(pricePostpaid, {
+    currency: "USD",
+    rateType: "postpaid",
+  });
+  const sanitizedPrepaid = sanitizeCarPriceBlock(pricePrepaid, {
+    currency: sanitizedPostpaid.currency,
+    rateType: "prepaid",
+  });
+
+  return {
+    ...car,
+    doors: numberOrZero(car.doors),
+    isPrepaid: Boolean(pricePrepaid),
+    allow_cancellation:
+      readString(pricePostpaid ?? {}, ["allow_cancellation"]) ??
+      (readBoolean(pricePostpaid ?? {}, ["free_cancellation"]) ? "true" : "false"),
+    runtimeType: readString(car, ["runtimeType", "type"]) ?? "car",
+    partner: {
+      ...partner,
+      phone: stringOrEmpty(partner.phone),
+      count: numberOrZero(partner.count),
+    },
+    discounts: {
+      ...discounts,
+      discount_code: stringOrEmpty(discounts.discount_code),
+      applied: stringOrEmpty(discounts.applied),
+    },
+    pickup: sanitizeCarLocationBlock(isRecord(car.pickup) ? car.pickup : null),
+    dropoff: sanitizeCarLocationBlock(isRecord(car.dropoff) ? car.dropoff : null),
+    price_postpaid: sanitizedPostpaid,
+    price_prepaid: sanitizedPrepaid,
+  };
 }
 
 function cryptoRandomId() {

@@ -7,6 +7,7 @@ import {
   StringSelectMenuBuilder,
 } from "discord.js";
 import type {
+  CarOffer,
   FlightOffer,
   TravelSession,
 } from "../types.js";
@@ -591,32 +592,70 @@ export function flightCheckoutMessage(session: TravelSession & { kind: "flight" 
   };
 }
 
+function formatCarRateType(rateType?: string) {
+  if (!rateType) return "";
+  if (rateType === "prepaid") return "Prepaid";
+  if (rateType === "postpaid") return "Pay Later";
+  return rateType;
+}
+
+function buildCarDescription(car: CarOffer) {
+  const lines = [
+    car.vendor,
+    `${formatPrice(car.price, car.currency)}${car.rateType ? ` (${formatCarRateType(car.rateType)})` : ""}`,
+    car.transmission ? `Transmission: ${car.transmission}` : null,
+    car.seats || car.doors || car.bags
+      ? `Passengers: ${car.seats ?? "—"} | Doors: ${car.doors ?? "—"} | Bags: ${car.bags ?? "—"}`
+      : null,
+    car.fuelType ? `Fuel Type: ${car.fuelType}` : null,
+    car.pickupLocation ? `Pickup: ${car.pickupLocation}` : null,
+    car.dropoffLocation ? `Dropoff: ${car.dropoffLocation}` : null,
+    car.freeCancellation !== undefined
+      ? `Free Cancellation: ${car.freeCancellation ? "Yes" : "No"}`
+      : null,
+    car.mileage ? `Mileage: ${car.mileage}` : null,
+    car.inclusions?.length ? `Inclusions: ${car.inclusions.join(", ")}` : null,
+  ].filter(Boolean);
+
+  return truncate(lines.join("\n"), 4000);
+}
+
 export function carResultsMessage(session: TravelSession & { kind: "car" }) {
+  if (session.data.cars.length === 0) {
+    return {
+      embeds: [
+        carSessionSummaryEmbed(session),
+        sectionHeaderEmbed(
+          "No cars found",
+          0xdc2626,
+          "RouteStack did not return rental cars for those locations and dates. Try nearby airports or different dates.",
+        ),
+      ],
+      components: [],
+    };
+  }
+
   const overview = sectionHeaderEmbed(
     "Rental car options",
     0xea580c,
     `${
       session.data.aiNote ??
-      `Found ${session.data.cars.length} car option(s) for ${session.data.pickup?.label} to ${session.data.dropoff?.label}.`
+      `Found ${session.data.cars.length} car option(s) for ${session.data.pickup?.label ?? session.data.pickupQuery} to ${session.data.dropoff?.label ?? session.data.dropoffQuery}.`
     }`,
   );
 
-  const carEmbeds = session.data.cars.map((car, index) =>
-    new EmbedBuilder()
+  const carEmbeds = session.data.cars.map((car, index) => {
+    const embed = new EmbedBuilder()
       .setColor(0xea580c)
       .setTitle(`${index + 1}. ${car.vehicleName}`)
-      .setDescription(
-        truncate(
-          `${car.vendor}\n${formatPrice(car.price, car.currency)}\n${car.transmission ?? "Transmission not provided"}`,
-          4000,
-        ),
-      )
-      .addFields(
-        car.seats
-          ? [{ name: "Seats", value: `${car.seats}`, inline: true }]
-          : [],
-      ),
-  );
+      .setDescription(buildCarDescription(car));
+
+    if (car.image) {
+      embed.setImage(car.image);
+    }
+
+    return embed;
+  });
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(`car:vehicle:${session.id}`)
@@ -654,10 +693,22 @@ export function carCheckoutMessage(session: TravelSession & { kind: "car" }) {
         : "RouteStack prepared car checkout.",
     )
     .addFields(
-      car ? { name: "Vehicle", value: car.vehicleName, inline: true } : { name: "Vehicle", value: "N/A", inline: true },
+      car ? { name: "Vehicle", value: car.vehicleName, inline: false } : { name: "Vehicle", value: "N/A", inline: false },
       car ? { name: "Vendor", value: car.vendor, inline: true } : { name: "Vendor", value: "N/A", inline: true },
-      { name: "Price", value: formatPrice(car?.price, car?.currency), inline: true },
+      {
+        name: "Price",
+        value: `${formatPrice(car?.price, car?.currency)}${car?.rateType ? ` (${formatCarRateType(car.rateType)})` : ""}`,
+        inline: true,
+      },
+      car?.pickupLocation
+        ? { name: "Pickup", value: truncate(car.pickupLocation, 1024), inline: false }
+        : { name: "Pickup", value: "N/A", inline: false },
+      car?.mileage ? { name: "Mileage", value: car.mileage, inline: true } : { name: "Mileage", value: "N/A", inline: true },
     );
+
+  if (car?.image) {
+    embed.setThumbnail(car.image);
+  }
 
   if (delivery.note) {
     embed.addFields({
