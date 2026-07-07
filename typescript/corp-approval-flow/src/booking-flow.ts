@@ -151,12 +151,12 @@ export async function deterministicSearch(request: EmployeeRequest) {
     return { summary: `Found ${options.length} flight options. Select one to revalidate fare and fetch checkout URL.`, options };
   }
 
-  const destinationRaw = (await callToolJson("search_destinations", { query: request.destination, type: "DESTINATION" })) as Record<string, unknown>;
+  const destinationRaw = (await callToolJson("hotel_search_destinations", { query: request.destination, type: "DESTINATION" })) as Record<string, unknown>;
   const destinations = Array.isArray(destinationRaw.result) ? (destinationRaw.result as Array<Record<string, unknown>>) : [];
   if (!destinations.length) throw new Error("No destinations found.");
 
   const destination = destinations[0];
-  const searchHotels = (await callToolJson("search_hotels", {
+  const searchHotels = (await callToolJson("hotel_search", {
     destinationId: destination.id,
     checkIn: request.checkInDate,
     checkOut: request.checkOutDate,
@@ -196,7 +196,7 @@ export async function prepareFlightCheckout(request: EmployeeRequest, selectedOp
     correlationId: raw.correlationId,
   });
 
-  const payment = await callToolJson("flight_get_payment_url", {
+  const payment = await callToolJson("flight_get_checkout_url", {
     flight: { ...raw, fareSourceCode, revalidateResult: revalidated },
     origin: request.origin,
     destination: request.destination,
@@ -227,7 +227,7 @@ export async function fetchHotelRooms(request: EmployeeRequest, selectedOption: 
     throw new Error("Selected hotel is missing hotel context (hotelId/token/correlationId).");
   }
 
-  const roomsRes = (await callToolJson("get_rooms_and_rates", {
+  const roomsRes = (await callToolJson("hotel_get_rooms_and_rates", {
     hotelId,
     token,
     correlationId,
@@ -275,7 +275,7 @@ export async function prepareHotelCheckout(
     throw new Error("Missing hotel checkout fields.");
   }
 
-  const revalidated = await callToolJson("revalidate", {
+  const revalidated = await callToolJson("hotel_revalidate_rate", {
     hotelId,
     recommendationId,
     token,
@@ -283,7 +283,7 @@ export async function prepareHotelCheckout(
     publishedRate: asNumber(selectedRoom.publishedRate) ?? selectedHotel.totalPrice ?? 0,
   });
 
-  const payment = await callToolJson("get_payment_url", {
+  const payment = await callToolJson("hotel_get_checkout_url", {
     hotelId,
     recommendationId,
     token,
@@ -303,7 +303,7 @@ export async function prepareHotelCheckout(
     displayedPrice: asNumber(selectedRoom.publishedRate) ?? selectedHotel.totalPrice ?? 0,
     priceCheckResult: revalidated,
   }).catch(async () =>
-    callToolJson("hotel_get_payment_url", {
+    callToolJson("hotel_get_checkout_url", {
       hotelId,
       recommendationId,
       token,

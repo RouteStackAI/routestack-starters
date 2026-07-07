@@ -10,7 +10,7 @@ const SYSTEM_PROMPT =
 FLIGHT SEARCH FLOW:
 flight_session → flight_locations → flight_search
 HOTEL SEARCH FLOW:
-search_destinations → search_hotels
+hotel_search_destinations → hotel_search
 `;
 
 function extractJson(result: McpToolResult): unknown {
@@ -149,7 +149,7 @@ export async function runSearchPrompt(prompt: string, tools: McpTool[]): Promise
 function handleToolResult(json: any, toolName: string) {
   let updatedResult = json;
 
-  if (toolName === "search_hotels" && json) {
+  if (toolName === "hotel_search" && json) {
     updatedResult =
       json?.result?.result?.length > 0
         ? {
@@ -172,7 +172,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_hotel_details" && json) {
+  if (toolName === "hotel_get_details" && json) {
     const hotelResult = json?.result;
     updatedResult = hotelResult
       ? {
@@ -209,7 +209,7 @@ function handleToolResult(json: any, toolName: string) {
       : json;
   }
 
-  if (toolName === "get_rooms_and_rates" && json) {
+  if (toolName === "hotel_get_rooms_and_rates" && json) {
     updatedResult =
       json?.result?.groups?.length > 0
         ? {
@@ -238,7 +238,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_booking_info" && json) {
+  if (toolName === "hotel_get_booking" && json) {
     const bookingResult = json?.result;
     updatedResult = bookingResult
       ? {

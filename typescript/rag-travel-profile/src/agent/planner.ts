@@ -397,7 +397,7 @@ function updateExecutionContext(
 ) {
   if (!result) return;
 
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     context.hotel.token = result?.result?.token;
     context.hotel.correlationId = result?.result?.correlationId;
     context.hotel.hotels = result?.result?.result.map((h: any) => ({
@@ -413,7 +413,7 @@ function updateExecutionContext(
     }));
   }
 
-  if (toolName === "get_hotel_details") {
+  if (toolName === "hotel_get_details") {
     context.hotel.selectedHotel = {
       hotelId: result?.id,
       hotelName: result?.name,
@@ -421,7 +421,7 @@ function updateExecutionContext(
     };
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     const hotelId = result?.result?.id;
 
     if (hotelId) {
@@ -443,7 +443,7 @@ function updateExecutionContext(
     }
   }
 
-  if (toolName === "revalidate") {
+  if (toolName === "hotel_revalidate_rate") {
     const hotelId = result?.result?.hotelId;
     if (hotelId === context.hotel.selectedHotel?.hotelId) {
       const selectedRoom = result?.result?.room?.[0];
@@ -603,7 +603,7 @@ function buildContextPrompt(context: ToolExecutionContext): string {
 function handleToolResult(json: any, toolName: string) {
   let updatedResult = json;
 
-  if (toolName === "get_hotel_details" && json) {
+  if (toolName === "hotel_get_details" && json) {
     const hotelResult = json?.result;
     updatedResult = hotelResult
       ? {
@@ -640,7 +640,7 @@ function handleToolResult(json: any, toolName: string) {
       : json;
   }
 
-  if (toolName === "get_rooms_and_rates" && json) {
+  if (toolName === "hotel_get_rooms_and_rates" && json) {
     updatedResult =
       json?.result?.groups?.length > 0
         ? {
@@ -669,7 +669,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_booking_info" && json) {
+  if (toolName === "hotel_get_booking" && json) {
     const bookingResult = json?.result;
     updatedResult = bookingResult
       ? {

@@ -16,7 +16,7 @@ interface McpToolResult {
   isError?: boolean;
 }
 
-const serverPort = Number(process.env.PORT ?? 3000);
+const serverPort = Number(process.env.PORT ?? 3080);
 const apiKey = process.env.VITE_ROUTESTACK_API_KEY ?? "";
 const apiSecret = process.env.VITE_ROUTESTACK_API_SECRET ?? "";
 const mcpUrl = process.env.VITE_ROUTESTACK_MCP_URL ?? "https://mcp.routestack.ai/sse";

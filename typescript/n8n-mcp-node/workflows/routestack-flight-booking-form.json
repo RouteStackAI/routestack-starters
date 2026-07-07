@@ -205,7 +205,7 @@
     },
     {
       "parameters": {
-        "toolName": "flight_get_payment_url",
+        "toolName": "flight_get_checkout_url",
         "toolArgs": "={{\n(() => {\n  const search = $('Prepare Flight Search').item.json;\n\n  const body = {\n    flight: $('Prepare Flight Selection').item.json.selectedFlight,\n    origin: search.originCode,\n    destination: search.destinationCode,\n    departureDate: search.departureDate,\n    adults: search.adults,\n    correlationId: $('Flight Search').item.json.response[0].text.parseJson().correlationId,\n    searchFilterObj: $('Flight Search').item.json.response[0].text.parseJson().searchFilterObj,\n    sessionId: $('Flight Session').item.json.response[0].text.parseJson().sessionId\n  };\n\n  if (search.returnDate) {\n    body.returnDate = search.returnDate;\n  }\n\n  return JSON.stringify(body, null, 2);\n})()\n}}"
       },
       "id": "d1f5f6a6-be06-4b13-9dd3-46501078d5a0",
@@ -238,7 +238,7 @@
     },
     {
       "parameters": {
-        "content": "## RouteStack Flight Booking Flow\n\nThis workflow calls RouteStack flight tools in sequence:\n\n1. `flight_session`\n2. `flight_locations`\n3. `flight_search`\n4. `flight_revalidate`\n5. `flight_get_payment_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports flight APIs\n- Update tool arguments if your API expects additional parameters",
+        "content": "## RouteStack Flight Booking Flow\n\nThis workflow calls RouteStack flight tools in sequence:\n\n1. `flight_session`\n2. `flight_locations`\n3. `flight_search`\n4. `flight_revalidate`\n5. `flight_get_checkout_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports flight APIs\n- Update tool arguments if your API expects additional parameters",
         "height": 360,
         "width": 760,
         "color": 5

@@ -16,16 +16,16 @@ STRICT RULES:
 - Follow correct sequence
 
 HOTEL FLOW:
-1. search_destinations → search_hotels
-2. search_hotels → get_rooms_and_rates
-3. get_rooms_and_rates → revalidate
-4. revalidate → get_payment_url
+1. hotel_search_destinations → hotel_search
+2. hotel_search → hotel_get_rooms_and_rates
+3. hotel_get_rooms_and_rates → hotel_revalidate_rate
+4. hotel_revalidate_rate → hotel_get_checkout_url
 
 FLIGHT FLOW:
 1. flight_session → flight_locations
 2. flight_locations → flight_search
 3. flight_search → flight_revalidate
-4. flight_revalidate → flight_get_payment_url
+4. flight_revalidate → flight_get_checkout_url
 
 Be concise and accurate.`;
 
@@ -418,7 +418,7 @@ function updateExecutionContext(
 ) {
   if (!result) return;
 
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     context.hotel.token = result?.result?.token;
     context.hotel.correlationId = result?.result?.correlationId;
     context.hotel.hotels = result?.result?.result.map((h: any) => ({
@@ -434,7 +434,7 @@ function updateExecutionContext(
     }));
   }
 
-  if (toolName === "get_hotel_details") {
+  if (toolName === "hotel_get_details") {
     context.hotel.selectedHotel = {
       hotelId: result?.id,
       hotelName: result?.name,
@@ -442,7 +442,7 @@ function updateExecutionContext(
     };
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     const hotelId = result?.result?.id;
 
     if (hotelId) {
@@ -464,7 +464,7 @@ function updateExecutionContext(
     }
   }
 
-  if (toolName === "revalidate") {
+  if (toolName === "hotel_revalidate_rate") {
     const hotelId = result?.result?.hotelId;
     if (hotelId === context.hotel.selectedHotel?.hotelId) {
       const selectedRoom = result?.result?.room?.[0];
@@ -534,7 +534,7 @@ function extractText(result: McpToolResult, toolName: string): string {
     return `Error: ${JSON.stringify(result.content)}`;
   }
 
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     let json = extractJson(result);
 
     if (json) {
@@ -563,7 +563,7 @@ function extractText(result: McpToolResult, toolName: string): string {
     }
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     let json = extractJson(result);
 
     if (json) {
@@ -698,7 +698,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function handleToolResult(json: any, toolName: string) {
   let updatedResult = json;
 
-  if (toolName === "search_hotels" && json) {
+  if (toolName === "hotel_search" && json) {
     updatedResult =
       json?.result?.result?.length > 0
         ? {
@@ -721,7 +721,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_hotel_details" && json) {
+  if (toolName === "hotel_get_details" && json) {
     const hotelResult = json?.result;
     updatedResult = hotelResult
       ? {
@@ -758,7 +758,7 @@ function handleToolResult(json: any, toolName: string) {
       : json;
   }
 
-  if (toolName === "get_rooms_and_rates" && json) {
+  if (toolName === "hotel_get_rooms_and_rates" && json) {
     updatedResult =
       json?.result?.groups?.length > 0
         ? {
@@ -787,7 +787,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_booking_info" && json) {
+  if (toolName === "hotel_get_booking" && json) {
     const bookingResult = json?.result;
     updatedResult = bookingResult
       ? {

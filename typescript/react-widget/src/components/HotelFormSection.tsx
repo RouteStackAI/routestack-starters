@@ -226,7 +226,7 @@ export default function HotelFormSection({
           <div>
             <div className="text-sm font-medium text-slate-200">Rooms</div>
             <div className="text-xs text-slate-400">
-              Configure per-room occupancy for `search_hotels`.
+              Configure per-room occupancy for `hotel_search`.
             </div>
           </div>
           <button

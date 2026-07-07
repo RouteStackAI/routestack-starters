@@ -6,6 +6,6 @@ compatibility_date = "2025-01-01"
 crons = ["0 9 * * *"]  # Daily at 9am UTC
 
 # Uncomment and fill in after running: npm run kv:create
-# [[kv_namespaces]]
-# binding = "PRICE_CACHE"
-# id = "your-kv-namespace-id"
+[[kv_namespaces]]
+binding = "PRICE_CACHE"
+id = "f2c57de46ac54dd484ba86283700fa38"

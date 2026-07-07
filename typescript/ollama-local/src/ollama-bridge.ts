@@ -17,16 +17,16 @@ STRICT RULES:
 - Keep responses brief.
 
 HOTEL FLOW:
-1. search_destinations -> search_hotels
-2. search_hotels -> get_rooms_and_rates
-3. get_rooms_and_rates -> revalidate
-4. revalidate -> get_payment_url
+1. hotel_search_destinations -> hotel_search
+2. hotel_search -> hotel_get_rooms_and_rates
+3. hotel_get_rooms_and_rates -> hotel_revalidate_rate
+4. hotel_revalidate_rate -> hotel_get_checkout_url
 
 FLIGHT FLOW:
 1. flight_session -> flight_locations
 2. flight_locations -> flight_search
 3. flight_search -> flight_revalidate
-4. flight_revalidate -> flight_get_payment_url`;
+4. flight_revalidate -> flight_get_checkout_url`;
 
 type OllamaRole = "system" | "user" | "assistant" | "tool";
 
@@ -350,7 +350,7 @@ function updateExecutionContext(
 
   if (!isRecord(result)) return;
 
-  if (toolName === "search_hotels" && isRecord(result.result)) {
+  if (toolName === "hotel_search" && isRecord(result.result)) {
     context.hotel.token =
       typeof result.result.token === "string" ? result.result.token : context.hotel.token;
     context.hotel.correlationId =
@@ -362,7 +362,7 @@ function updateExecutionContext(
       : context.hotel.hotels;
   }
 
-  if (toolName === "get_hotel_details") {
+  if (toolName === "hotel_get_details") {
     context.hotel.selectedHotel = {
       hotelId: typeof result.id === "string" ? result.id : context.hotel.selectedHotel?.hotelId,
       hotelName:
@@ -370,7 +370,7 @@ function updateExecutionContext(
     };
   }
 
-  if (toolName === "get_rooms_and_rates" && isRecord(result.result)) {
+  if (toolName === "hotel_get_rooms_and_rates" && isRecord(result.result)) {
     const hotelId = typeof result.result.id === "string" ? result.result.id : undefined;
 
     if (hotelId && Array.isArray(context.hotel.hotels)) {
@@ -389,7 +389,7 @@ function updateExecutionContext(
     }
   }
 
-  if (toolName === "revalidate" && isRecord(result.result)) {
+  if (toolName === "hotel_revalidate_rate" && isRecord(result.result)) {
     const room = Array.isArray(result.result.room) ? result.result.room[0] : undefined;
     const rate = Array.isArray(result.result.rate) ? result.result.rate[0] : undefined;
 

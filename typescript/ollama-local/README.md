@@ -39,7 +39,7 @@ pnpm start
 │                     │                     │  (Remote SSE)        │
 │  ┌───────────────┐  │     Results         │                      │
 │  │ Ollama        │  │ ←────────────────── │  search_flights()    │
-│  │ (Llama 3.1)   │  │                     │  search_hotels()     │
+│  │ (Llama 3.1)   │  │                     │  hotel_search()     │
 │  └───────────────┘  │                     │  search_cars()       │
 └─────────────────────┘                     └──────────────────────┘
 ```

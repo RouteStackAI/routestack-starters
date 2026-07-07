@@ -59,13 +59,13 @@ You can also use ISO dates:
 ### Hotels
 
 1. `/hotels` parses the Slack command text
-2. The bot calls `search_destinations`
+2. The bot calls `hotel_search_destinations`
 3. The user selects a destination in Slack
-4. The bot calls `search_hotels`
+4. The bot calls `hotel_search`
 5. The user selects a hotel
-6. The bot calls `get_hotel_details` and `get_rooms_and_rates`
+6. The bot calls `hotel_get_details` and `hotel_get_rooms_and_rates`
 7. The user selects a room
-8. The bot calls `revalidate` and `hotel_get_payment_url`
+8. The bot calls `hotel_revalidate_rate` and `hotel_get_checkout_url`
 
 ### Flights
 
@@ -74,7 +74,7 @@ You can also use ISO dates:
 3. The bot optionally opens `flight_session` when available
 4. The bot calls `flight_search`
 5. The user selects a fare
-6. The bot calls `flight_revalidate` and `flight_get_payment_url`
+6. The bot calls `flight_revalidate` and `flight_get_checkout_url`
 
 ### Cars
 
@@ -82,7 +82,7 @@ You can also use ISO dates:
 2. The bot resolves pickup and dropoff with `car_locations`
 3. The bot calls `car_search`
 4. The user selects a vehicle
-5. The bot calls `car_revalidate` and `car_get_payment_url`
+5. The bot calls `car_revalidate` and `car_get_checkout_url`
 
 ## Customization
 

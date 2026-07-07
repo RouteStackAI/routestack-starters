@@ -68,7 +68,7 @@ export async function createHotelDiscoverySession(input: {
   rooms: HotelRoomOccupancy[];
   currency: string;
 }): Promise<HotelSessionData> {
-  const raw = (await callToolJson("search_destinations", {
+  const raw = (await callToolJson("hotel_search_destinations", {
     query: input.query,
     type: "DESTINATION",
   })) as { result?: unknown[] };
@@ -94,7 +94,7 @@ export async function searchHotelsForDestination(
   input: HotelSessionData,
   destination: HotelLookupOption,
 ): Promise<HotelSessionData> {
-  const json = await callToolJson("search_hotels", {
+  const json = await callToolJson("hotel_search", {
     destinationId: destination.id,
     checkIn: input.checkIn,
     checkOut: input.checkOut,
@@ -130,11 +130,11 @@ export async function inspectHotel(
     throw new Error("Hotel search token or correlationId is missing.");
   }
 
-  const details = (await callToolJson("get_hotel_details", {
+  const details = (await callToolJson("hotel_get_details", {
     hotelId: hotel.id,
   })) as Record<string, unknown>;
 
-  const roomsJson = await callToolJson("get_rooms_and_rates", {
+  const roomsJson = await callToolJson("hotel_get_rooms_and_rates", {
     hotelId: hotel.id,
     token: session.token,
     correlationId: session.correlationId,
@@ -176,7 +176,7 @@ export async function prepareHotelCheckout(
     throw new Error("Hotel session metadata is missing.");
   }
 
-  const priceCheckResult = (await callToolJson("revalidate", {
+  const priceCheckResult = (await callToolJson("hotel_revalidate_rate", {
     hotelId: session.selectedHotel.id,
     recommendationId: room.recommendationId,
     token: session.token,
@@ -184,7 +184,7 @@ export async function prepareHotelCheckout(
     publishedRate: room.price ?? session.selectedHotel.price ?? 0,
   })) as Record<string, unknown>;
 
-  const paymentJson = await callToolJson("hotel_get_payment_url", {
+  const paymentJson = await callToolJson("hotel_get_checkout_url", {
     hotelId: session.selectedHotel.id,
     recommendationId: room.recommendationId,
     token: session.token,
@@ -305,7 +305,7 @@ export async function prepareFlightCheckout(
     correlationId: flight.correlationId ?? session.correlationId,
   });
 
-  const paymentJson = await callToolJson("flight_get_payment_url", {
+  const paymentJson = await callToolJson("flight_get_checkout_url", {
     flight: {
       ...flight.raw,
       fareSourceCode,
@@ -392,7 +392,7 @@ export async function prepareCarCheckout(
     correlationId: car.correlationId,
   });
 
-  const paymentJson = await callToolJson("car_get_payment_url", {
+  const paymentJson = await callToolJson("car_get_checkout_url", {
     pickup: session.pickup.code ?? session.pickup.label,
     dropoff: session.dropoff.code ?? session.dropoff.label,
     pickupDate: session.pickupDate,

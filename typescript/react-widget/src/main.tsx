@@ -21,7 +21,7 @@ function DemoApp() {
         </div>
       </section>
 
-      <TravelSearch apiBaseUrl="http://127.0.0.1:3000" />
+      <TravelSearch apiBaseUrl="http://127.0.0.1:3080" />
     </main>
   );
 }

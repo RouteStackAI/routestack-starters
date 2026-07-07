@@ -65,7 +65,7 @@
     },
     {
       "parameters": {
-        "toolName": "search_destinations",
+        "toolName": "hotel_search_destinations",
         "toolArgs": "={\n    \"query\": \"{{$json.destination}}\",\n    \"type\": \"DESTINATION\"\n}"
       },
       "id": "cb78400b-9bbb-482d-b280-5145268da45a",
@@ -85,7 +85,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const form = $items('Normalize Input', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst list = parsed.result || parsed.data || parsed.destinations || [];\nconst destination = Array.isArray(list) ? list[0] : null;\nconst destinationId = destination?.id || destination?.code || destination?.destinationId;\n\nconst today = new Date();\ntoday.setDate(today.getDate() + 30)\nconst checkInDate = today.toISOString().split(\"T\")[0];\ntoday.setDate(today.getDate() + 1)\nconst checkOutDate = today.toISOString().split(\"T\")[0];\nif (!destinationId) {\n  throw new Error('No destinationId found from search_destinations response');\n}\n\nreturn {\n    \"destinationId\": destinationId,\n    \"checkIn\": form.checkin || checkInDate,\n    \"checkOut\": form.checkout || checkOutDate,\n    \"rooms\": [{\n      adults: form.adults\n    }],\n    \"lat\": destination.coordinates.lat,\n    \"long\": destination.coordinates.long,\n    \"currency\": form.currency\n}"
+        "jsCode": "const form = $items('Normalize Input', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst list = parsed.result || parsed.data || parsed.destinations || [];\nconst destination = Array.isArray(list) ? list[0] : null;\nconst destinationId = destination?.id || destination?.code || destination?.destinationId;\n\nconst today = new Date();\ntoday.setDate(today.getDate() + 30)\nconst checkInDate = today.toISOString().split(\"T\")[0];\ntoday.setDate(today.getDate() + 1)\nconst checkOutDate = today.toISOString().split(\"T\")[0];\nif (!destinationId) {\n  throw new Error('No destinationId found from hotel_search_destinations response');\n}\n\nreturn {\n    \"destinationId\": destinationId,\n    \"checkIn\": form.checkin || checkInDate,\n    \"checkOut\": form.checkout || checkOutDate,\n    \"rooms\": [{\n      adults: form.adults\n    }],\n    \"lat\": destination.coordinates.lat,\n    \"long\": destination.coordinates.long,\n    \"currency\": form.currency\n}"
       },
       "id": "8c78ffb2-b406-4a31-8528-63886bf58b9b",
       "name": "Prepare Hotel Search Args",
@@ -98,7 +98,7 @@
     },
     {
       "parameters": {
-        "toolName": "search_hotels",
+        "toolName": "hotel_search",
         "toolArgs": "={\n    \"destinationId\": \"{{$json.destinationId}}\",\n    \"checkIn\": \"{{$json.checkIn}}\",\n    \"checkOut\": \"{{$json.checkOut}}\",\n    \"rooms\": [\n      {\n        \"adults\": {{$json.rooms[0].adults}}\n      }\n    ],\n    \"lat\": {{$json.lat}},\n    \"long\": {{$json.long}},\n    \"currency\": \"{{$json.currency || \"USD\"}}\"\n  }"
       },
       "id": "534257e3-33f8-4920-950e-86940d458b89",
@@ -131,7 +131,7 @@
     },
     {
       "parameters": {
-        "toolName": "get_hotel_details",
+        "toolName": "hotel_get_details",
         "toolArgs": "={\"hotelId\": \"{{$json.hotelId}}\"}"
       },
       "id": "6ac56cca-ecea-48fb-81a2-61cdf93e6583",
@@ -151,7 +151,7 @@
     },
     {
       "parameters": {
-        "toolName": "get_rooms_and_rates",
+        "toolName": "hotel_get_rooms_and_rates",
         "toolArgs": "={\n    \"hotelId\": \"{{$json.args.parseJson().hotelId}}\",\n    \"token\": \"{{$('Search Hotels').item.json.response[0].text.parseJson().result.token}}\",\n    \"correlationId\": \"{{$('Search Hotels').item.json.response[0].text.parseJson().result.correlationId}}\",\n    \"checkIn\": \"{{$('Search Hotels').item.json.args.parseJson().checkIn}}\",\n    \"checkOut\": \"{{$('Search Hotels').item.json.args.parseJson().checkOut}}\",\n    \"rooms\": [\n        {\n            \"adults\": {{$('Search Hotels').item.json.args.parseJson().rooms[0].adults}},\n            \"children\": 0\n        }\n    ],\n    \"hotelName\": \"{{ $json.response[0].text.parseJson().result.name }}\",\n    \"publishedRate\": {{$('Search Hotels').item.json.response[0].text.parseJson().result.result[0].ourprice}}\n}"
       },
       "id": "ab828112-2167-4b63-9fd3-b1f9fe4abe57",
@@ -171,7 +171,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $items('Prepare Hotel Selection', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst groups = parsed?.result?.groups || [];\nconst rooms = groups.flatMap(g => g.rooms || []);\nif (!rooms.length) {\n  throw new Error('No rooms found for selected hotel');\n}\nconst index = Math.min(ctx.roomIndex || 0, rooms.length - 1);\nconst room = rooms[index];\nconst roomId = room?.id;\nconst recommendationId = room?.recommendationId;\nconst publishedRate = room?.publishedRate;\nif (!roomId || !recommendationId) {\n  throw new Error('Missing roomId/recommendationId for revalidate');\n}\nreturn [{\n  json: {\n    ...ctx,\n    roomId,\n    recommendationId,\n    publishedRate,\n    selectedRoom: room\n  }\n}];"
+        "jsCode": "const ctx = $items('Prepare Hotel Selection', 0, 0)[0].json;\nconst rawText = $json.response?.[0]?.text || '{}';\nconst parsed = JSON.parse(rawText);\nconst groups = parsed?.result?.groups || [];\nconst rooms = groups.flatMap(g => g.rooms || []);\nif (!rooms.length) {\n  throw new Error('No rooms found for selected hotel');\n}\nconst index = Math.min(ctx.roomIndex || 0, rooms.length - 1);\nconst room = rooms[index];\nconst roomId = room?.id;\nconst recommendationId = room?.recommendationId;\nconst publishedRate = room?.publishedRate;\nif (!roomId || !recommendationId) {\n  throw new Error('Missing roomId/recommendationId for hotel_revalidate_rate');\n}\nreturn [{\n  json: {\n    ...ctx,\n    roomId,\n    recommendationId,\n    publishedRate,\n    selectedRoom: room\n  }\n}];"
       },
       "id": "80e39bd9-3c2d-415a-beb8-e098ae8b6cc6",
       "name": "Prepare Revalidate Args",
@@ -184,7 +184,7 @@
     },
     {
       "parameters": {
-        "toolName": "revalidate",
+        "toolName": "hotel_revalidate_rate",
         "toolArgs": "={\n    \"hotelId\": \"{{$json.hotelId}}\",\n    \"recommendationId\": \"{{$json.recommendationId}}\",\n    \"token\": \"{{$json.token}}\",\n    \"correlationId\": \"{{$json.correlationId}}\",\n    \"publishedRate\": {{$json.publishedRate}}\n}"
       },
       "id": "8bee0f9c-7e8f-47b6-8956-f21b02f1bc45",
@@ -204,7 +204,7 @@
     },
     {
       "parameters": {
-        "toolName": "hotel_get_payment_url",
+        "toolName": "hotel_get_checkout_url",
         "toolArgs": "={\n    \"hotelId\": \"{{JSON.parse($json.response[0].text).result.hotelId}}\",\n    \"recommendationId\": \"{{$json.args.parseJson().recommendationId}}\",\n    \"token\": \"{{$json.args.parseJson().token}}\",\n    \"checkIn\": \"{{$('Get Rooms and Rates').item.json.args.parseJson().checkIn}}\",\n    \"checkOut\": \"{{$('Get Rooms and Rates').item.json.args.parseJson().checkOut}}\",\n    \"roomId\": \"{{JSON.parse($json.response[0].text).result.room[0].id}}\",\n    \"hotelName\": \"{{$('Prepare Revalidate Args').item.json.hotelName}}\",\n    \"hotelAddress\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.contact.address.city.name}}\",\n    \"hotelImage\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.heroImage || $('Get Hotel Details').item.json.response[0].text.parseJson().result.heroImage || \"\"}}\",\n    \"hotelLatitude\": {{$('Prepare Revalidate Args').item.json.lat}},\n    \"hotelLongitude\": {{$('Prepare Revalidate Args').item.json.long}},\n    \"hotelStarRating\": {{$('Prepare Revalidate Args').item.json.selectedHotel.starRating}},\n    \"hotelRating\": {{$('Prepare Revalidate Args').item.json.selectedHotel.starRating}},\n    \"correlationId\": \"{{$json.args.parseJson().correlationId}}\",\n    \"travellers\": \"Room 1: {{$('Prepare Revalidate Args').item.json.rooms[0].adults}}A/0C\",\n    \"destination\": \"{{$('Prepare Revalidate Args').item.json.selectedHotel.contact.address.city.name}}\",\n    \"displayedPrice\": {{JSON.parse($json.response[0].text).result.rate[0].publishedRate}},\n    \"priceCheckResult\": {{$json.response[0].text}}\n}"
       },
       "id": "d513b9b1-1da6-4212-b35c-92db958905c1",
@@ -237,7 +237,7 @@
     },
     {
       "parameters": {
-        "content": "## Form-based Hotel Booking Flow\n\nThis workflow calls RouteStack hotel tools in sequence:\n1. `search_destinations`\n2. `search_hotels`\n3. `get_hotel_details`\n4. `get_rooms_and_rates`\n5. `revalidate`\n6. `hotel_get_payment_url`\n\nBefore activating:\n- Set credentials on every RouteStack node\n- Replace `YOUR_ROUTESTACK_CREDENTIAL_ID` with your credential id\n- If your MCP server expects additional args, add them in toolArgs JSON expressions",
+        "content": "## Form-based Hotel Booking Flow\n\nThis workflow calls RouteStack hotel tools in sequence:\n1. `hotel_search_destinations`\n2. `hotel_search`\n3. `hotel_get_details`\n4. `hotel_get_rooms_and_rates`\n5. `hotel_revalidate_rate`\n6. `hotel_get_checkout_url`\n\nBefore activating:\n- Set credentials on every RouteStack node\n- Replace `YOUR_ROUTESTACK_CREDENTIAL_ID` with your credential id\n- If your MCP server expects additional args, add them in toolArgs JSON expressions",
         "height": 360,
         "width": 760,
         "color": 7

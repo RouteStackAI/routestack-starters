@@ -66,7 +66,7 @@ app.get("/api/lookups/hotel-destination", async (c) => {
   try {
     const query = c.req.query("query")?.trim();
     if (!query || query.length < 2) return c.json({ options: [] });
-    const result = await callTool("search_destinations", { query, type: "DESTINATION" });
+    const result = await callTool("hotel_search_destinations", { query, type: "DESTINATION" });
     if (result.isError) return c.json({ options: [] });
     const json = extractJsonFromTool(result) as Record<string, unknown> | null;
     const list = Array.isArray(json?.result) ? (json?.result as Array<Record<string, unknown>>) : [];

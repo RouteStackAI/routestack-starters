@@ -24,19 +24,19 @@ STRICT RULES:
 - For car_search tool, if dates are not provided or provided as past dates, use the current date + 15 days as the start date and 1 day as the end date and execute the tool with the default values.
 
 HOTEL FLOW:
-1. search_destinations → search_hotels
-2. search_hotels → get_rooms_and_rates
-3. get_rooms_and_rates → revalidate
-4. revalidate → get_payment_url
+1. hotel_search_destinations → hotel_search
+2. hotel_search → hotel_get_rooms_and_rates
+3. hotel_get_rooms_and_rates → hotel_revalidate_rate
+4. hotel_revalidate_rate → hotel_get_checkout_url
 
 FLIGHT FLOW:
 1. flight_session → flight_locations
 2. flight_locations → flight_search
 3. flight_search → flight_revalidate
-4. flight_revalidate → flight_get_payment_url
+4. flight_revalidate → flight_get_checkout_url
 
 CAR FLOW:
-car_locations → car_search → car_revalidate → car_get_payment_url
+car_locations → car_search → car_revalidate → car_get_checkout_url
 
 Be concise and accurate.`;
 
@@ -545,7 +545,7 @@ function extractJson(result: McpToolResult): any {
 function reduceToolResult(toolName: string, json: any): any {
   if (!json) return json;
 
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     return {
       token: json?.result?.token,
       correlationId: json?.result?.correlationId,
@@ -564,7 +564,7 @@ function reduceToolResult(toolName: string, json: any): any {
     };
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     const root = json?.result ?? json;
     const groups =
       firstArray(
@@ -594,7 +594,7 @@ function reduceToolResult(toolName: string, json: any): any {
     };
   }
 
-  if (toolName === "get_hotel_details") {
+  if (toolName === "hotel_get_details") {
     return {
       id: json?.result?.id,
       name: json?.result?.name,
@@ -642,20 +642,20 @@ function updateExecutionContext(
   context.generic.recentSummaries.push(`${toolName} completed`);
   context.generic.recentSummaries = context.generic.recentSummaries.slice(-10);
 
-  if (toolName === "search_hotels" && result) {
+  if (toolName === "hotel_search" && result) {
     context.hotel.token = result.token;
     context.hotel.correlationId = result.correlationId;
     context.hotel.hotels = result.hotels;
   }
 
-  if (toolName === "get_hotel_details" && result?.id) {
+  if (toolName === "hotel_get_details" && result?.id) {
     context.hotel.selectedHotel = {
       hotelId: result.id,
       hotelName: result.name,
     };
   }
 
-  if (toolName === "get_rooms_and_rates" && result) {
+  if (toolName === "hotel_get_rooms_and_rates" && result) {
     context.hotel.rooms = result.rooms ?? [];
     if (result.hotelId) {
       const selectedHotel = (context.hotel.hotels ?? []).find((hotel) => hotel.id === result.hotelId);
@@ -668,7 +668,7 @@ function updateExecutionContext(
     }
   }
 
-  if (toolName === "revalidate" && result?.result?.room?.[0]) {
+  if (toolName === "hotel_revalidate_rate" && result?.result?.room?.[0]) {
     const room = result.result.room[0];
     const rate = result.result.rate?.[0];
     const cachedRoom = (context.hotel.rooms ?? []).find((entry) => entry.id === room.id);
@@ -698,7 +698,7 @@ function updateExecutionContext(
   }
 
   if (
-    (toolName === "flight_revalidate" || toolName === "flight_get_payment_url") &&
+    (toolName === "flight_revalidate" || toolName === "flight_get_checkout_url") &&
     hasValue(args.fareSourceCode)
   ) {
     context.flight.selectedFlight = {
@@ -741,8 +741,8 @@ function updateExecutionContext(
 
 function summarizeToolResult(toolName: string, result: any, toolResult: McpToolResult) {
   if (toolResult.isError) return `${toolName} returned an error`;
-  if (toolName === "search_hotels") return `${toolName} found ${(result?.hotels ?? []).length} hotels`;
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_search") return `${toolName} found ${(result?.hotels ?? []).length} hotels`;
+  if (toolName === "hotel_get_rooms_and_rates") {
     return `${toolName} returned ${(result?.rooms ?? []).length} room options`;
   }
   if (toolName === "flight_search") return `${toolName} found ${(result?.flights ?? []).length} flights`;
@@ -753,7 +753,7 @@ function summarizeToolResult(toolName: string, result: any, toolResult: McpToolR
 function resultSectionFromTool(toolName: string, json: any): ResultSection | null {
   if (!json) return null;
 
-  if (toolName === "search_hotels" && Array.isArray(json.hotels)) {
+  if (toolName === "hotel_search" && Array.isArray(json.hotels)) {
     return {
       title: "Hotels",
       kind: "hotel",
@@ -773,7 +773,7 @@ function resultSectionFromTool(toolName: string, json: any): ResultSection | nul
     };
   }
 
-  if (toolName === "get_rooms_and_rates" && Array.isArray(json.rooms)) {
+  if (toolName === "hotel_get_rooms_and_rates" && Array.isArray(json.rooms)) {
     return {
       title: "Rooms",
       kind: "booking",

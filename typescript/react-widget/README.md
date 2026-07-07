@@ -8,7 +8,7 @@ A working React sample for RouteStack travel search. The UI runs in Vite, and a 
 - A Vite demo page in `src/main.tsx`
 - A local Node API bridge for RouteStack MCP
 - RouteStack MCP connection logic with `StreamableHTTP` and SSE fallback
-- Flexible tool argument mapping for `search_flights`, `search_hotels`, and `search_cars`
+- Flexible tool argument mapping for `search_flights`, `hotel_search`, and `search_cars`
 - Result cards for flights, hotels, and cars
 
 ## Prerequisites

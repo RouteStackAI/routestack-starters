@@ -13,19 +13,19 @@ export function buildSystemPrompt(preferences: string) {
   ${preferences || "No stored preferences found"}
 
   HOTEL FLOW:
-  1. search_destinations → search_hotels
-  2. search_hotels → get_rooms_and_rates
-  3. get_rooms_and_rates → revalidate
-  4. revalidate → get_payment_url
+  1. hotel_search_destinations → hotel_search
+  2. hotel_search → hotel_get_rooms_and_rates
+  3. hotel_get_rooms_and_rates → hotel_revalidate_rate
+  4. hotel_revalidate_rate → hotel_get_checkout_url
 
   FLIGHT FLOW:
   1. flight_session → flight_locations
   2. flight_locations → flight_search
   3. flight_search → flight_revalidate
-  4. flight_revalidate → flight_get_payment_url
+  4. flight_revalidate → flight_get_checkout_url
 
   CAR FLOW:
-  car_locations → car_search → car_revalidate → car_get_payment_url
+  car_locations → car_search → car_revalidate → car_get_checkout_url
 
   When searching:
   - Prefer ranking results based on stored preferences

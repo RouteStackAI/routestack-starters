@@ -166,7 +166,7 @@
     },
     {
       "parameters": {
-        "toolName": "car_get_payment_url",
+        "toolName": "car_get_checkout_url",
         "toolArgs": "={{\n(() => {\n  const search = $('Prepare Car Search').item.json;\n\n  const body = {\n    pickup: search.pickupCode,\n    dropoff: search.dropoffCode,\n    pickupDate: search.pickupDate,\n    dropoffDate: search.dropoffDate,\n    car: $('Prepare Car Selection').item.json.selectedCar\n  };\n\n  return JSON.stringify(body, null, 2);\n})()\n}}"
       },
       "id": "b7ab93f5-2cb8-4d9e-84e8-88664fd51008",
@@ -199,7 +199,7 @@
     },
     {
       "parameters": {
-        "content": "## RouteStack Car Booking Flow\n\nThis workflow calls RouteStack car tools in sequence:\n\n1. `car_locations`\n2. `car_search`\n3. `car_revalidate`\n4. `car_get_payment_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports car APIs\n- Update tool arguments if your API expects additional parameters",
+        "content": "## RouteStack Car Booking Flow\n\nThis workflow calls RouteStack car tools in sequence:\n\n1. `car_locations`\n2. `car_search`\n3. `car_revalidate`\n4. `car_get_checkout_url`\n\nBefore activating:\n- Configure RouteStack credentials on all RouteStack nodes\n- Ensure your MCP server supports car APIs\n- Update tool arguments if your API expects additional parameters",
         "height": 320,
         "width": 760,
         "color": 4

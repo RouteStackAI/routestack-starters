@@ -140,7 +140,7 @@ function buildToolArgs(
     }
   }
 
-  if (toolName === "flight_get_payment_url") {
+  if (toolName === "flight_get_checkout_url") {
     const filter = context.flight.searchArgs?.filter ?? {};
     const selected = context.flight.selectedFlight;
 
@@ -184,11 +184,11 @@ function buildToolArgs(
   // ---------------------------------------
   // HOTEL
   // ---------------------------------------
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     enriched.limit ??= context.hotel.limit;
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     const hotel = context.hotel.selectedHotel;
     const search = context.hotel.searchArgs;
 
@@ -202,7 +202,7 @@ function buildToolArgs(
     enriched.publishedRate ??= hotel?.displayedPrice;
   }
 
-  if (toolName === "revalidate") {
+  if (toolName === "hotel_revalidate_rate") {
     enriched.hotelId ??= context.hotel.selectedHotel?.hotelId;
     enriched.recommendationId ??= context.hotel.selectedRoom?.recommendationId;
     enriched.token ??= context.hotel.token;
@@ -210,7 +210,7 @@ function buildToolArgs(
     enriched.publishedRate ??= context.hotel.selectedRoom?.displayedPrice;
   }
 
-  if (toolName === "get_payment_url" || toolName === "hotel_get_payment_url") {
+  if (toolName === "hotel_get_checkout_url") {
     const hotel = context.hotel.selectedHotel;
     const room = context.hotel.selectedRoom;
     const search = context.hotel.searchArgs;
@@ -240,7 +240,7 @@ function buildToolArgs(
     enriched.correlationId ??= context.car.correlationId;
   }
 
-  if (toolName === "car_get_payment_url") {
+  if (toolName === "car_get_checkout_url") {
     const search = context.car.searchArgs;
 
     enriched.pickup ??= search?.filter?.pickup;
@@ -256,7 +256,7 @@ function buildToolArgs(
 function handleToolResult(json: any, toolName: string) {
   let updatedResult = json;
 
-  if (toolName === "search_hotels" && json) {
+  if (toolName === "hotel_search" && json) {
     updatedResult =
       json?.result?.result?.length > 0
         ? {
@@ -279,7 +279,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_hotel_details" && json) {
+  if (toolName === "hotel_get_details" && json) {
     const hotelResult = json?.result;
     updatedResult = hotelResult
       ? {
@@ -316,7 +316,7 @@ function handleToolResult(json: any, toolName: string) {
       : json;
   }
 
-  if (toolName === "get_rooms_and_rates" && json) {
+  if (toolName === "hotel_get_rooms_and_rates" && json) {
     updatedResult =
       json?.result?.groups?.length > 0
         ? {
@@ -345,7 +345,7 @@ function handleToolResult(json: any, toolName: string) {
         : json;
   }
 
-  if (toolName === "get_booking_info" && json) {
+  if (toolName === "hotel_get_booking" && json) {
     const bookingResult = json?.result;
     updatedResult = bookingResult
       ? {
@@ -419,7 +419,7 @@ function updateExecutionContext(
 ) {
   if (!result) return;
 
-  if (toolName === "search_hotels") {
+  if (toolName === "hotel_search") {
     context.hotel.token = result?.result?.token;
     context.hotel.correlationId = result?.result?.correlationId;
     context.hotel.hotels = result?.result?.result.map((h: any) => ({
@@ -435,7 +435,7 @@ function updateExecutionContext(
     }));
   }
 
-  if (toolName === "get_hotel_details") {
+  if (toolName === "hotel_get_details") {
     context.hotel.selectedHotel = {
       hotelId: result?.id,
       hotelName: result?.name,
@@ -443,7 +443,7 @@ function updateExecutionContext(
     };
   }
 
-  if (toolName === "get_rooms_and_rates") {
+  if (toolName === "hotel_get_rooms_and_rates") {
     const hotelId = result?.result?.id;
 
     if (hotelId) {
@@ -465,7 +465,7 @@ function updateExecutionContext(
     }
   }
 
-  if (toolName === "revalidate") {
+  if (toolName === "hotel_revalidate_rate") {
     const hotelId = result?.result?.hotelId;
     if (hotelId === context.hotel.selectedHotel?.hotelId) {
       const selectedRoom = result?.result?.room?.[0];
@@ -631,13 +631,13 @@ export async function POST(req: Request) {
 You are RouteStack travel assistant.
 
 HOTEL FLOW:
-search_destinations → search_hotels → get_rooms_and_rates → revalidate → get_payment_url
+hotel_search_destinations → hotel_search → hotel_get_rooms_and_rates → hotel_revalidate_rate → hotel_get_checkout_url
 
 FLIGHT FLOW:
-flight_session → flight_locations → flight_search → flight_revalidate → flight_get_payment_url
+flight_session → flight_locations → flight_search → flight_revalidate → flight_get_checkout_url
 
 CAR FLOW:
-car_locations → car_search → car_revalidate → car_get_payment_url
+car_locations → car_search → car_revalidate → car_get_checkout_url
 
 ${buildContextPrompt(context)}
 

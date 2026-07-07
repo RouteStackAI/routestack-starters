@@ -26,11 +26,11 @@ function humanizeToolName(name: string): string {
 
 function toolMessage(name: string): string {
   const toolMessages: Record<string, string> = {
-    search_destinations: "Finding destinations...",
-    search_hotels: "Searching hotels...",
-    get_hotel_details: "Loading hotel details...",
-    get_rooms_and_rates: "Fetching room availability...",
-    revalidate: "Revalidating selected room...",
+    hotel_search_destinations: "Finding destinations...",
+    hotel_search: "Searching hotels...",
+    hotel_get_details: "Loading hotel details...",
+    hotel_get_rooms_and_rates: "Fetching room availability...",
+    hotel_revalidate_rate: "Revalidating selected room...",
 
     flight_session: "Starting flight session...",
     flight_locations: "Resolving airport locations...",

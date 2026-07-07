@@ -67,13 +67,13 @@ pnpm start
 
 ### Hotels
 
-1. `/hotels` calls `search_destinations`
+1. `/hotels` calls `hotel_search_destinations`
 2. The user chooses a destination in Discord
-3. The bot calls `search_hotels`
+3. The bot calls `hotel_search`
 4. The user chooses a hotel
-5. The bot calls `get_hotel_details` and `get_rooms_and_rates`
+5. The bot calls `hotel_get_details` and `hotel_get_rooms_and_rates`
 6. The user chooses a room
-7. The bot calls `revalidate` and `hotel_get_payment_url`
+7. The bot calls `hotel_revalidate_rate` and `hotel_get_checkout_url`
 
 ### Flights
 
@@ -81,14 +81,14 @@ pnpm start
 2. The bot optionally opens `flight_session` when available
 3. The bot calls `flight_search`
 4. The user chooses a fare
-5. The bot calls `flight_revalidate` and `flight_get_payment_url`
+5. The bot calls `flight_revalidate` and `flight_get_checkout_url`
 
 ### Cars
 
 1. `/cars` resolves locations with `car_locations`
 2. The bot calls `car_search`
 3. The user chooses a vehicle
-4. The bot calls `car_revalidate` and `car_get_payment_url`
+4. The bot calls `car_revalidate` and `car_get_checkout_url`
 
 ## Notes
 

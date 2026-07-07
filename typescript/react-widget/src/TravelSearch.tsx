@@ -351,7 +351,7 @@ export function TravelSearch({
       "hotel-destination-search",
       "Searching destinations",
       async () => {
-        const json = (await callToolJson("search_destinations", {
+        const json = (await callToolJson("hotel_search_destinations", {
           query,
           type: "DESTINATION",
         })) as { result: any[] };
@@ -397,7 +397,7 @@ export function TravelSearch({
           limit: 20,
         };
 
-        const json = await callToolJson("search_hotels", args);
+        const json = await callToolJson("hotel_search", args);
         const normalized = normalizeHotelListings(json, destination.fullName);
 
         setHotelFlow((current) => ({
@@ -434,11 +434,11 @@ export function TravelSearch({
       `hotel-inspect-${hotel.id}`,
       "Loading hotel details",
       async () => {
-        const details = (await callToolJson("get_hotel_details", {
+        const details = (await callToolJson("hotel_get_details", {
           hotelId: hotel.id,
         })) as Record<string, unknown>;
 
-        const roomsRaw = await callToolJson("get_rooms_and_rates", {
+        const roomsRaw = await callToolJson("hotel_get_rooms_and_rates", {
           hotelId: hotel.id,
           token: hotelFlow.token,
           correlationId: hotelFlow.correlationId,
@@ -489,7 +489,7 @@ export function TravelSearch({
       `hotel-checkout-${room.id}`,
       "Preparing hotel checkout",
       async () => {
-        const revalidation = (await callToolJson("revalidate", {
+        const revalidation = (await callToolJson("hotel_revalidate_rate", {
           hotelId: hotel.id,
           recommendationId: room.recommendationId,
           token: hotelFlow.token,
@@ -519,7 +519,7 @@ export function TravelSearch({
         };
 
         const paymentJson = await callToolJson(
-          "hotel_get_payment_url",
+          "hotel_get_checkout_url",
           paymentArgs,
         );
         const paymentUrl = extractPaymentUrl(paymentJson);
@@ -693,7 +693,7 @@ export function TravelSearch({
         };
 
         const paymentJson = await callToolJson(
-          "flight_get_payment_url",
+          "flight_get_checkout_url",
           paymentArgs,
         );
         const paymentUrl = extractPaymentUrl(paymentJson);
@@ -817,7 +817,7 @@ export function TravelSearch({
         };
 
         const paymentJson = await callToolJson(
-          "car_get_payment_url",
+          "car_get_checkout_url",
           paymentArgs,
         );
         const paymentUrl = extractPaymentUrl(paymentJson);

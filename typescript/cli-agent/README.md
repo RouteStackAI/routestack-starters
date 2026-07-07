@@ -49,7 +49,7 @@ LLM: openai (gpt-4o)
 MCP: https://mcp.routestack.ai/sse
 
 Connected to https://mcp.routestack.ai/sse — 3 tools available
-Tools: search_flights, search_hotels, search_cars
+Tools: search_flights, hotel_search, search_cars
 
 Type a travel query (e.g., "Find flights from LAX to JFK on Dec 15")
 Type "exit" to quit.
@@ -68,7 +68,7 @@ I found 5 flights from LAX to JFK on December 15:
 The cheapest option is Delta DL918 at $165 (evening departure).
 
 routestack> What about hotels near Times Square?
-  -> search_hotels(location=Times Square, New York, check_in=2026-12-15)
+  -> hotel_search(location=Times Square, New York, check_in=2026-12-15)
 
 Here are hotels near Times Square:
 

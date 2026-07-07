@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug corp-approval-flow",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/typescript/corp-approval-flow",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--inspect-brk", "--import", "tsx"],
+      "args": ["src/index.ts"],
+      "envFile": "${workspaceFolder}/typescript/corp-approval-flow/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
